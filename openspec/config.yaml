@@ -1,32 +1,40 @@
 schema: spec-driven
 
-# Project context (optional)
-# Add only constraints that should guide OpenSpec artifacts and workflows.
-# Include constraints an agent cannot infer by reading the code.
-# Keep general project documentation and discoverable codebase facts out.
-# Example:
-#   context: |
-#     Designs and tasks must cover Windows, macOS, and Linux
-#     Write all artifacts in Spanish
+context: |
+  Spec-first development. Specs are the source of truth and must match problem-statement.md.
+  Departures from it are recorded in openspec/traceability.md.
+  Ground rules:
+  G1. Every feature change, big or small, is its own OpenSpec change.
+  G2. Each added or modified requirement maps to exactly one task, and each task to exactly one requirement.
+  G3. Every code change, even one line, belongs to a requirement. If it changes behaviour or code an
+      existing requirement covers, that requirement is MODIFIED. Otherwise a requirement is ADDED.
+      MODIFIED needs the requirement in openspec/specs/, so archive the change that added it first.
+      Code for a requirement in a change that is not archived yet is covered by editing that change.
+  G4. Only one agent writes at a time. See "Write lock" in CLAUDE.md.
+  G5. The core flow MVP (change core-flow-mvp) is built first.
+  G6. Every design.md has data contracts or schemas, tool schemas, agent flow and design decisions.
+      Decisions are marked Proposed until a human and an agent agree on them after brainstorming.
+  G7. proposal.md says what, design.md says how, tasks.md holds executable tasks, and spec.md holds
+      the scenarios that each task must satisfy.
+  G8. Every design.md explains decisions in pseudo-technical form and plain English, and shows the
+      high-level architecture flow, low-level component interactions and data contracts.
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always state what is out of scope
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+rules:
+  proposal:
+    - Say what changes and why. Put no implementation detail here.
+    - One feature per change.
+  specs:
+    - Every requirement has scenarios that cover everything its task must deliver.
+  design:
+    - 'Use these headings: Context, Design decisions, High-level architecture flow, Low-level component design, Data contracts, Tool schemas, Agent flow, Open decisions, Risks. Write "None" where a section does not apply.'
+    - Give each decision a status (Proposed or Agreed), pseudo-technical form and plain English.
+  tasks:
+    - 'Exactly one checkbox task per ADDED or MODIFIED requirement, tagged [Requirement: <exact name>], naming each of its scenarios as the verification.'
+    - No other checkbox tasks. Spikes and gates are prerequisites described in design.md.
 
-# Per-operation guidance (optional)
-# Add advisory guidance for how apply and archive work should be conducted.
-# This is separate from artifact rules above.
-# Example:
-#   operations:
-#     apply:
-#       guidance:
-#         - Keep test summaries concise
-#     archive:
-#       guidance:
-#         - Summarize the archive outcome before finishing
+operations:
+  apply:
+    guidance:
+      - Do not implement a change whose design still has Proposed decisions that affect it.
+      - Take the write lock in CLAUDE.md before editing any file.
+      - Run node openspec/check-rules.js and openspec validate --all --strict before and after.

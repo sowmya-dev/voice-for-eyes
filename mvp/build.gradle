@@ -1,0 +1,13 @@
+plugins {
+    id 'com.android.application')
+    id 'org.jetbrains.kotlin.android')
+}
+android {
+    compileSdk 33
+    defaultConfig { minSdk 26; applicationId 'com.voicefor.eyes.mvp' }
+}
+dependencies {
+    implementation 'androidx.camera:camera-lifecycle:1.4.0-beta01'
+    implementation 'androidx.camera:camera-view:1.4.0-beta01'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+}

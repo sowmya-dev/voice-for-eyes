@@ -1,0 +1,29 @@
+| Blind user |
+
+|
+
+Android client
+
+| Voice trigger | Guided capture --| Quality gate + Preprocessor |
+
+|
+
+Agent
+
+| Intent router | Orchestrator | Tool registry | | session memory |
+
+|
+
+Tools (pluggable)
+
+| OCR | | Scene describe | Object finder | | Human fallback |
+Execution
+| Local models | | Network policy | | Cloud models | | Cache |
+Response v follow-up returns to Voice trigger
+| Composer | Speech output + Barge-in + Blind user |
+Cross-cutting
+
+Privacy | | Security | | Observability | | Feedback loop |
+
+User-facing path [_] Agent core Pluggable / supporting
+

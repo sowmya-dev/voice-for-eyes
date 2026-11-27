@@ -1,0 +1,30 @@
+{ ~
+Android client
+| Microphone + Noise filter + VAD + Opus encoder |
+| Voice Ul | | State machine | | On-device STT | | Local store |
+Se | ot
+{ ~
+Network layer
+| Network monitor --| Policy engine + Outbox queue | gRPC stream |
+XY | /
+{ ~
+Backend
+| Edge gateway + Auth + Stream ingest + STT adapter |
+¥
+| Message queue | Response gen | Intent / LLM | Post-processing |
+Me | ot
+{ ~
+Data layer
+| User dictionary | | Transcripts | | Session cache | | Config store |
+XY /
+
+Cross-cutting
+
+Observability
+
+| | Security | | Feature flags | |
+
+Main voice path
+
+Supporting component
+

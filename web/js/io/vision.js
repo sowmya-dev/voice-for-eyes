@@ -1,5 +1,5 @@
 // Camera frames -> cleanup worker -> OCR on every copy -> two-copy agreement.
-import { extractFields, agree, emptyReading } from '../core/label.js';
+import { extractFields, agree, emptyReading, labelIdOf } from '../core/label.js';
 import { postFallback } from './api.js';
 
 const DETECTION = { textDetLimitSideLen: 736, textDetLimitType: 'max' };
@@ -96,22 +96,39 @@ export async function countFrames(frames, used, post) {
   return counts[0] !== null && counts[0] === counts[1] ? counts[0] : null;
 }
 
-// Reads every copy upright. Only when neither the name nor the expiry is found, the averaged copy is read
-// at each quarter turn, and every copy is read again at the turn that found the most confident text.
-// If either was found, the strip is the right way up and the rest is usually on its other side.
+// Reads every copy upright and keeps what it finds. A strip can print the name along its length and the
+// expiry across it, so each missing name or expiry is looked for at its own quarter turn: the averaged copy
+// is read at each turn, and a turn that shows the field must be confirmed by a second copy at that turn.
 export async function readOriented(copies, read) {
   const upright = [];
   for (const copy of copies) upright.push(await read(copy, 0));
   const reading = agree(upright.map(extractFields));
-  if (reading.name || reading.expiry) return { lines: upright, reading };
+  if (reading.name && reading.expiry) return { lines: upright, reading };
   const probe = copies.find((c) => c.kind === 'averaged') ?? copies[0];
-  const tried = new Map([[0, upright[copies.indexOf(probe)]]]);
-  for (const turn of [1, 2, 3]) tried.set(turn, await read(probe, turn));
-  const best = [...tried.keys()].reduce((a, b) => (textWeight(tried.get(b)) > textWeight(tried.get(a)) ? b : a));
-  if (best === 0) return { lines: upright, reading };
-  const lines = [];
-  for (const copy of copies) lines.push(copy === probe ? tried.get(best) : await read(copy, best));
-  return { lines, reading: agree(lines.map(extractFields)) };
+  const second = copies.find((c) => c.kind === 'enhanced' && c !== probe) ?? copies.find((c) => c !== probe);
+  const turns = [];
+  for (const turn of [1, 2, 3]) {
+    const lines = await read(probe, turn);
+    turns.push({ turn, lines, fields: extractFields(lines), confirm: null });
+  }
+  turns.sort((a, b) => textWeight(b.lines) - textWeight(a.lines));
+  const used = new Set();
+  for (const field of ['name', 'expiry']) {
+    if (reading[field]) continue;
+    for (const t of turns.filter((x) => x.fields[field])) {
+      t.confirm ??= second ? await read(second, t.turn) : [];
+      const agreed = agree([t.fields, extractFields(t.confirm)]);
+      if (!agreed[field]) continue;
+      // Anything else this turn confirms fills only what the upright reading left empty.
+      for (const [key, value] of Object.entries(agreed)) {
+        if (value !== null && !Array.isArray(value) && reading[key] == null) reading[key] = value;
+      }
+      used.add(t);
+      break;
+    }
+  }
+  reading.labelId = labelIdOf(reading.name, reading.expiry);
+  return { lines: [...upright, ...[...used].flatMap((t) => [t.lines, t.confirm])], reading };
 }
 
 const textWeight = (lines) => lines.reduce((sum, l) => sum + l.score * l.text.trim().length, 0);

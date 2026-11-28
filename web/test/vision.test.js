@@ -40,13 +40,14 @@ test('Upright strip: no turned copy is read', async () => {
   assert.ok(ocr.calls.every(([, turn]) => turn === 0), JSON.stringify(ocr.calls));
 });
 
-test('Upside-down strip: the half turn is found and every copy is read at it', async () => {
+test('Upside-down strip: the half turn is found and confirmed by a second copy', async () => {
   const ocr = ocrAt(2);
   const { reading, lines } = await readOriented(copies, ocr.read);
   assert.equal(reading.name, 'DOLO 650');
   assert.deepEqual(reading.expiry, { year: 2027, month: 12, day: null });
-  assert.equal(lines.length, 3);
-  for (const kind of ['averaged', 'binarised']) assert.ok(ocr.calls.some(([k, t]) => k === kind && t === 2), kind);
+  assert.equal(reading.labelId, 'DOLO650|2027-12');
+  assert.equal(lines.length, 5, 'three upright copies plus the two at the half turn');
+  for (const kind of ['averaged', 'enhanced']) assert.ok(ocr.calls.some(([k, t]) => k === kind && t === 2), kind);
 });
 
 test('Sideways strip: a quarter turn either way is found', async () => {
@@ -56,17 +57,27 @@ test('Sideways strip: a quarter turn either way is found', async () => {
   }
 });
 
-test('Upright strip: a name read upright means no turned copy, even without the expiry', async () => {
-  const calls = [];
-  await readOriented(copies, async (copy, turn) => { calls.push(turn); return [LABEL[0]]; });
-  assert.ok(calls.every((turn) => turn === 0), JSON.stringify(calls));
+test('Vertical name, horizontal expiry: each field is read at its own turn', async () => {
+  const [name, , expiry] = LABEL;
+  // Upright, only the expiry reads; the name runs along the strip and reads after a quarter turn.
+  const read = async (copy, turn) => (turn === 0 ? [expiry] : turn === 1 ? [name] : NOISE);
+  const { reading } = await readOriented(copies, read);
+  assert.equal(reading.name, 'DOLO 650');
+  assert.deepEqual(reading.expiry, { year: 2027, month: 12, day: null });
+  assert.equal(reading.labelId, 'DOLO650|2027-12');
+});
+
+test('A name seen at one turn by only one copy is not accepted', async () => {
+  const [name, , expiry] = LABEL;
+  const read = async (copy, turn) => (turn === 0 ? [expiry] : turn === 1 && copy.kind === 'averaged' ? [name] : NOISE);
+  assert.equal((await readOriented(copies, read)).reading.name, null);
 });
 
 test('Nothing readable at any turn keeps the upright reading', async () => {
   const ocr = ocrAt(-1);
   const { reading } = await readOriented(copies, ocr.read);
   assert.equal(reading.name, null);
-  assert.equal(ocr.calls.filter(([, t]) => t !== 0).length, 3, 'only the enhanced copy is tried at each turn');
+  assert.equal(ocr.calls.filter(([, t]) => t !== 0).length, 3, 'only the averaged copy is tried at each turn');
 });
 
 const strip = { x: 100, y: 100, w: 400, h: 200 };

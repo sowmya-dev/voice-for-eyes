@@ -121,6 +121,8 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
     lastLabel: null, memory: [], cancelTimer: null,
     cloudHistory: { scene: [], general: [] }, // questions and answers sent back as context for follow-ups
     followUp: null, // 'scene' or 'general' right after such an answer: an unmatched question continues it
+    told: new Set(), // what has been said about the strip this session: 'all' (what it is), 'expiry', 'count'
+    lastVerdict: null, stillTurn: null,
     label: null, // { reading, at, count }: everything read from the strip in front of the camera, gathered across reads
   };
   const stale = (turn) => turn !== state.turn;
@@ -171,6 +173,11 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
     const started = ports.now();
     let result = await capture();
     const budget = () => (partlyRead(result.reading) ? CLEAN_KNOWN_MS : CLEAN_MS);
+    if (!complete(result.reading, today()) && partlyRead(result.reading) && state.stillTurn !== turn && !stale(turn)) {
+      state.stillTurn = turn;
+      const known = result.reading.name ?? formatDate(result.reading.expiry, state.lang);
+      await speak([seg('look.still', { name: known })]);
+    }
     while (!complete(result.reading, today()) && ports.now() - started < budget() && !stale(turn)) result = await capture();
     return result;
   }
@@ -206,6 +213,12 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
     const segments = [...prefix, ...verdict.plan.segments];
     const text = renderSegments(segments, state.lang);
     const emergency = draft.aspect === 'emergency';
+    state.lastVerdict = verdict;
+    if (draft.medicine && label) {
+      if (draft.aspect === 'all') state.told.add('all');
+      if (['all', 'expiry'].includes(draft.aspect) && label.expiry) state.told.add('expiry');
+      if (draft.aspect === 'count' && count !== null) state.told.add('count');
+    }
     state.followUp = ['scene', 'general'].includes(draft.intent) ? draft.intent : null;
     const earlier = state.risk;
     const tone = emergency ? 'emergency' : verdict.expired === true ? 'warn' : 'ok';
@@ -240,7 +253,21 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
       if (state.memory.length > MEMORY_SIZE) state.memory.shift();
     }
     countInBackground();
-    return deliver(draft, label, turn, ctx);
+    await deliver(draft, label, turn, ctx);
+    return offerNext(label, turn);
+  }
+
+  // After a plain answer, offer the next thing not yet told: what it is, the expiry, then the count.
+  async function offerNext(label, turn) {
+    const verdict = state.lastVerdict;
+    if (stale(turn) || state.risk || state.task || !verdict || verdict.expired === true || verdict.requiresConfirmation) return;
+    const canCount = Boolean(ports.countTablets) || typeof state.label?.count === 'number';
+    const available = { all: Boolean(label?.name), expiry: Boolean(label?.expiry), count: canCount };
+    const next = ['all', 'expiry', 'count'].find((aspect) => available[aspect] && !state.told.has(aspect));
+    if (!next) return;
+    state.offer = { aspect: next, friendly: true };
+    update({ spoken: `${state.view.spoken} ${renderSegments([seg(`confirm.${next}`)], state.lang)}` });
+    await speak([seg(`confirm.${next}`)]);
   }
 
   // Once the label is complete, the tablets are counted once without making the user wait.
@@ -256,7 +283,7 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
   async function medicine(intent, turn, ctx) {
     const known = remembered();
     if (known && complete(known.reading, today()) && !namesAnotherMedicine(ctx.text, known.reading)) {
-      if (!(intent.name === 'identify' && intent.aspect === 'all')) return finishMedicine(intent, known.reading, turn, ctx);
+      if (!(intent.name === 'identify' && intent.aspect === 'all') || ctx.fromOffer) return finishMedicine(intent, known.reading, turn, ctx);
       // "What is this tablet?" takes one look: a different strip replaces the remembered one, otherwise memory answers.
       look(ctx.asked);
       const glance = await capture();
@@ -385,6 +412,7 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
     if (seen !== null && state.label) state.label.count = seen;
     const segment = seen === null ? seg('count.give_up') : seen === 1 ? seg('count.visible_one') : seg('count.visible', { n: seen });
     await deliver({ intent: 'identify', aspect: 'count', medicine: true, segments: [segment] }, label, turn, { ...ctx, count: seen });
+    if (seen !== null) await offerNext(label, turn);
   }
 
   // ---------- safety events ----------
@@ -519,7 +547,7 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
     if (name === 'start_over') {
       Object.assign(state, {
         risk: null, unclear: 0, offer: null, task: null, paused: null, history: [], label: null,
-        lastLabel: null, memory: [], cloudHistory: { scene: [], general: [] }, followUp: null,
+        lastLabel: null, memory: [], cloudHistory: { scene: [], general: [] }, followUp: null, told: new Set(),
       });
       return show({ screen: '1' }, { remember: false });
     }
@@ -604,13 +632,15 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
 
     const ctx = { text: said, asked: said || null, prefix: [] };
     if (state.offer) {
-      const { aspect } = state.offer;
+      const { aspect, friendly } = state.offer;
       state.offer = null;
       if (isConfirm(said)) {
         state.unclear = 0;
         const wanted = aspect === 'dose' ? { name: 'dose', aspect: null } : { name: 'identify', aspect };
+        if (friendly) return answer(wanted, turn, { ...ctx, fromOffer: true });
         return answer(wanted, turn, { ...ctx, prefix: [seg('heard.you_said', { text: said })] });
       }
+      if (friendly && notARequest) return speak([seg('offer.declined')]);
       if (notARequest) {
         state.unclear = 3;
         return prompt([seg('unclear.again')], { screen: '2', asked: said, step: 3 });

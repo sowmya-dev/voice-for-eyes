@@ -171,7 +171,7 @@ test('Years left: more than N years', async () => {
 test('Expiry not read: the system says it cannot read the expiry date', async () => {
   const t = setup({ readings: [noExpiry()] });
   await t.hear('When does it expire?');
-  assert.match(t.said[0].text, /^I can read: Dolo 650\. I can't read the expiry date\./);
+  assert.ok(t.said.some((s) => /^I can read: Dolo 650\. I can't read the expiry date\./.test(s.text)), t.text());
 });
 
 test('Expiry question within one month: no separate notice, other answers keep it', async () => {

@@ -5,6 +5,8 @@ import { cueFor } from '../js/core/guidance.js';
 
 const cutLeft = () => noExpiry({ lines: [{ text: 'Dolo 650', score: 0.9, box: { x: 2, y: 300, w: 600, h: 60 } }] });
 const FINAL = /can't confirm.*ask someone to check/;
+const STILL = /Hold it there, I'm still reading the rest/;
+const asked = (t) => t.said.filter((s) => !STILL.test(s.text)); // what is said apart from the still-reading line
 const READS_PER_BUDGET = 9; // a 17 s budget at 2 s per fake read
 const nothing = () => noExpiry({ name: null, lines: [{ text: '|l', score: 0.9, box: { x: 2, y: 300, w: 600, h: 60 } }] });
 
@@ -17,8 +19,10 @@ test('blurry label: five seconds of cleaning when nothing is read', async () => 
 test('partly read label: 17 seconds of reading, then the exact sentence with one direction', async () => {
   const t = setup({ readings: [cutLeft()] });
   await t.hear('What is this tablet?');
-  assert.ok(t.said[0].at >= 17000, `read only ${t.said[0].at} ms`);
-  assert.match(t.said[0].text, /^I can read: Dolo 650\. I can't read this\. Move the medicine (left|right) so I can see the expiry date\./);
+  assert.match(t.said[0].text, STILL, 'it says it is still reading before it asks');
+  assert.equal(t.said.filter((s) => STILL.test(s.text)).length, 1, 'only once');
+  assert.ok(asked(t)[0].at >= 17000, `read only ${asked(t)[0].at} ms`);
+  assert.match(asked(t)[0].text, /^I can read: Dolo 650\. I can't read this\. Move the medicine (left|right) so I can see the expiry date\./);
   const first = t.views.find((v) => v.screen === '5');
   assert.equal(first.attempt, 1);
   assert.equal(first.direction, 'right', 'a rear camera: cut at the left edge means move right');
@@ -55,8 +59,8 @@ test('camera is fixed before the medicine is moved', async () => {
   const shaky = { reading: cutLeft(), quality: { ...GOOD_QUALITY, sharpness: 10, motion: 30 } };
   const t = setup({ readings: [...Array(READS_PER_BUDGET)].fill(shaky).concat({ reading: cutLeft(), quality: GOOD_QUALITY }) });
   await t.hear('What is this tablet?');
-  assert.match(t.said[0].text, /hold the phone still/i);
-  assert.match(t.said[1].text, /Move the medicine/);
+  assert.match(asked(t)[0].text, /hold the phone still/i);
+  assert.match(asked(t)[1].text, /Move the medicine/);
 });
 
 test('moving but sharp: no request to hold still', () => {
@@ -153,7 +157,7 @@ test('count: asks for the entire strip up to three times, then asks someone to c
 test('count: counted on a retry; with no counter nothing is guessed', async () => {
   const t = setup({ counts: [{ count: null }, { count: 4 }] });
   await t.hear('How many are left in this strip?');
-  assert.equal(t.said.at(-1).text, 'I can see 4 tablets.');
+  assert.ok(t.said.some((s) => s.text === 'I can see 4 tablets.'), t.text());
   assert.equal(t.view().tiles.count, '4');
   const none = setup();
   await none.hear('How many are left in this strip?');

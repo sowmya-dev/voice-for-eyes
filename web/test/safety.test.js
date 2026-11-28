@@ -9,7 +9,7 @@ const printed = (over) => reading({ dosage: 'Dosage: As directed by the physicia
 test('identify: danger-first answer with purpose, expiry and the confirm-with-doctor line', async () => {
   const t = setup();
   await t.hear('What is this tablet?');
-  assert.match(t.said[0].text, /^Dolo 650, a fever tablet\. Expires in 3 months\./);
+  assert.match(t.said[0].text, /^This is Dolo 650, a fever tablet\. Expires in 3 months\./);
   assert.match(t.said[0].text, /confirm with a doctor or pharmacist before taking it/);
   assert.equal(t.view().screen, '3');
   assert.equal(t.view().asked, 'What is this tablet?');
@@ -23,7 +23,7 @@ test('identify: danger-first answer with purpose, expiry and the confirm-with-do
 test('no purpose when the ingredient is not in the table', async () => {
   const t = setup({ readings: [reading({ ingredient: null, name: 'Zzyxin 10' })] });
   await t.hear('What is this tablet?');
-  assert.match(t.said[0].text, /^Zzyxin 10\./);
+  assert.match(t.said[0].text, /^This is Zzyxin 10\./);
   assert.doesNotMatch(t.text(), /tablet\.|confirm with a doctor/);
 });
 

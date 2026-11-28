@@ -24,11 +24,19 @@ When no cloud key is configured, the app SHALL show a "key not set" message for 
 - **THEN** a "key not set" message is shown and spoken, and cloud assistance stays unavailable
 
 ### Requirement: Limited cloud use
-When enabled, cloud assistance SHALL be used only for speech that local recognition failed on, general knowledge and scene descriptions.
+When enabled, cloud assistance SHALL be used only for speech that local recognition failed on, general knowledge, scene descriptions and, when the `molmo` pocket detector is chosen, pointing at the tablets in a strip photo for a count. Molmo's reply SHALL be used only as points to be counted: it SHALL NOT be spoken and SHALL NOT answer any question about the medicine.
 
 #### Scenario: Local recognition fails
 - **WHEN** local speech-to-text fails and cloud assistance is enabled
 - **THEN** cloud speech-to-text may be used
+
+#### Scenario: Strip photo with cloud off
+- **WHEN** the `molmo` pocket detector is chosen and cloud assistance is off
+- **THEN** no strip photo is sent to OpenRouter and there is no second opinion
+
+#### Scenario: Points only
+- **WHEN** cloud assistance is on and Molmo is asked to point at the tablets on a strip
+- **THEN** only its points are counted, and nothing it writes is shown or spoken
 
 ### Requirement: Never safety or dosage
 The cloud SHALL NOT handle safety or dosage answers.

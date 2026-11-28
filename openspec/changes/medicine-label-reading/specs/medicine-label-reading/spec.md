@@ -103,7 +103,7 @@ When two medicine strips are in view, the system SHALL name each medicine that h
 - **THEN** the system names that one, says it cannot read the other, and gives the other no name or purpose
 
 ### Requirement: Conversational replies
-Replies SHALL sound like a person talking while every sentence still comes from a fixed template. Identification SHALL be said as a sentence ("This is Dolo 650, a fever tablet."). When a read takes longer than the first look and part of the label is already read, the system SHALL say once that it is still reading, naming what it has ("I can see Dolo 650. Hold it there, I'm still reading the rest."). After a medicine answer with no warning and no risk question, the system SHALL offer one thing it has not yet told in this session (what the medicine is, then the expiry, then the count when counting is available; identification tells the name and the expiry) as a yes-or-no question, and a "yes" SHALL be answered from the remembered label. The exact sentences required by the safety and failure-recovery rules SHALL NOT change.
+Replies SHALL sound like a person talking while every sentence still comes from a fixed template. Identification SHALL be said as a sentence ("This is Dolo 650, a fever tablet."). When a read takes longer than the first look and part of the label is already read, the system SHALL say once that it is still reading, naming what it has ("I can see Dolo 650. Hold it there, I'm still reading the rest."). After a medicine answer with no warning and no risk question, the system SHALL offer one thing it has not yet told in this session (what the medicine is, then the expiry, then the count, but the count only when a count is already remembered, so that an offer never leads to a request to show the strip; identification tells the name and the expiry) as a yes-or-no question, and a "yes" SHALL be answered from the remembered label. The exact sentences required by the safety and failure-recovery rules SHALL NOT change.
 
 #### Scenario: Identified as a sentence
 - **WHEN** the user asks "What is this tablet?" about Dolo 650
@@ -122,8 +122,16 @@ Replies SHALL sound like a person talking while every sentence still comes from 
 - **THEN** the answer comes from the remembered label without reading the camera
 
 #### Scenario: Nothing left to offer
-- **WHEN** the name, the expiry and the count have been told, or only the count is left and counting is not available
+- **WHEN** the name, the expiry and the count have been told, or only the count is left and no count is remembered
 - **THEN** no offer is made
+
+#### Scenario: Count offered only when known
+- **WHEN** the tablets were counted in the background and the name and the expiry have been told
+- **THEN** the count is offered, and a "yes" is answered from memory without the camera
+
+#### Scenario: Count not offered after it failed
+- **WHEN** a strip model is configured but no count could be worked out for this strip
+- **THEN** the count is not offered
 
 #### Scenario: No offer after a warning
 - **WHEN** the answer carries the expired warning or asks "Do you understand the risk?"

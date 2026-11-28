@@ -33,10 +33,10 @@ All decisions are **Proposed**. None is agreed until we brainstorm this change.
 - **Plain English:** Movement between frames is only a problem if it blurred every frame. Cleaning keeps the sharpest frames and lines them up, so a moving hand with one sharp frame is not asked to hold still.
 - **Pseudo-technical:** `hold_still if quality.motion > LIMITS.motion and quality.sharpness < LIMITS.sharpness`
 
-### 6. A partly read label gets more time and more tries
-- **Status:** Agreed (user, 2026-11-28: "EVEN IF one field is read ... increase the retry limit to 5 ... and the time taken for each read too by 10-15 seconds")
-- **Plain English:** Once the name or the expiry has been read, the strip is clearly in front of the camera, so the app keeps reading for longer before asking, allows five requests instead of three, and shows what it has read on the card while it asks for the rest.
-- **Pseudo-technical:** `known = label.name || label.expiry; budget = known ? 17s : 5s; maxAttempts = known ? 5 : 3; retry screens carry tiles = tilesFor(gathered label)`
+### 6. A partly read label gets more time
+- **Status:** Agreed (user, 2026-11-28: "EVEN IF one field is read ... increase the retry limit to 5 ... and the time taken for each read too by 10-15 seconds"); the five requests were dropped the same day by decision 8
+- **Plain English:** Once the name or the expiry has been read, the strip is clearly in front of the camera, so the app keeps reading for longer before asking (17 seconds, not 5) and shows what it has read on the card while it asks for the rest. The limit is three requests of any kind (decision 8).
+- **Pseudo-technical:** `known = label.name || label.expiry; budget = known ? 17s : 5s; retry screens carry tiles = tilesFor(gathered label)`
 
 ### 7. One request for a count
 - **Status:** Agreed (user, 2026-11-28: "it still keeps asking to show entire strip")
@@ -47,6 +47,11 @@ All decisions are **Proposed**. None is agreed until we brainstorm this change.
 - **Status:** Agreed (user, 2026-11-28: "stop asking again and again ... have 3 retries and take to landing page")
 - **Plain English:** Camera fixes used to come on top of 3 (later 5) move requests, so one question could bring 8 requests. Now every request counts, at most 3, and then the app says the final message and goes back to the landing screen. What was read stays remembered.
 - **Pseudo-technical:** `retry: if task.attempt >= 3: giveUp -> say retry.final, show screen 1; task.attempt += 1 for camera and strip cues alike`
+
+### 9. One request per strip, not per question
+- **Status:** Proposed (the user reported on 2026-11-28 that the app still asks to show the strip again and again, then asked for spec only; not built)
+- **Plain English:** Three things still brought the request back. The app offered to count after almost every answer although it could not (medicine-label-reading, decision 8); a "yes" then asked the user to show the strip; and every repeated count question asked again. The request is now made at most once for a strip in a session. Asked again, the app takes another look without asking and says honestly what it sees. With more than one strip in view it asks, once, to see just one.
+- **Pseudo-technical:** `entry.countAsked = true after the first request for this strip; count(): result = countOnce(); if !counted and !entry.countAsked: ask once (show_strip | one_strip | show_print), look again; then answer (count | used_only | give_up) with no further request`
 
 ## High-level architecture flow
 ```text

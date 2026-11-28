@@ -106,11 +106,19 @@ When the system can tell that the part of a strip with the expiry has been cut o
 - **THEN** the unreadable-label steps apply
 
 ### Requirement: Whole strip for a count
-When the user asks how many tablets are in a strip and no count can be accepted, the system SHALL ask once, either to show the entire strip or, when used pockets are seen but the printed total is not known, to show the side with the pack size. If the count is still not reliable after that one request, the system SHALL stop asking, say what it could see (such as the number of used pockets), say that it cannot tell how many are left, ask the user to have someone count them, and return to the landing screen.
+When the user asks how many tablets are in a strip and no count can be accepted, the system SHALL ask at most once for that strip in a session: to show the entire strip, to show only one strip when more than one is in view, or, when used pockets are seen but the printed total is not known, to show the side with the pack size. If the count is still not reliable after that one request, the system SHALL stop asking, say what it could see (such as the number of used pockets), say that it cannot tell how many are left, ask the user to have someone count them, and return to the landing screen. When the user asks again for the count of a strip that has already had its one request, the system SHALL look once more without asking and answer in the same honest way.
 
 #### Scenario: Strip not fully visible
 - **WHEN** part of the strip is hidden or unclear and no count can be accepted
 - **THEN** the system asks the user to show the entire strip and states no number
+
+#### Scenario: More than one strip in view
+- **WHEN** two strips are outlined in the frame
+- **THEN** the system asks to see just one strip and states no number
+
+#### Scenario: Asked again about the same strip
+- **WHEN** the count of a strip could not be worked out and the user asks for it again
+- **THEN** the system looks again without any request, and either gives the count or says again that it cannot count it
 
 #### Scenario: Counted on a retry
 - **WHEN** the count becomes reliable after the request

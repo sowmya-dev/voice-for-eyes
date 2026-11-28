@@ -43,6 +43,11 @@ All decisions are **Proposed**. None is agreed until we brainstorm this change.
 - **Plain English:** A strip's biggest letters matter most: the brand, then strength and ingredient, then smaller print. Every line two copies agree on is kept with its letter size, grouped as largest, larger, large or small, and remembered with the rest of the label. Asked what is written, the app reads it biggest first, a few lines at a time. Dosage lines stay out of that reading so the dosage rules still apply.
 - **Pseudo-technical:** `texts = agreed lines -> {text, size: size ?? box.h, tier: size/max >= .8 largest, >= .55 larger, >= .35 large, else small}, sorted by size desc; mergeReading unions texts by normalised text (keep the larger size); intent identify/text -> read texts.filter(not dosage).slice(start, start + 8); more -> offer {aspect: text, start + 8}`
 
+### 8. Offer the count only when it is already known
+- **Status:** Proposed (the user reported on 2026-11-28 that the app still asks to show the strip again and again, then asked for spec only; not built)
+- **Plain English:** "Do you want to know how many tablets are left?" was offered whenever a strip model was set up, even when counting had just failed, and a "yes" then asked the user to show the strip. An offer must be something the app can answer on the spot, so the count is offered only when a count is already remembered.
+- **Pseudo-technical:** `available.count = typeof state.label?.count === 'number'` (today: a strip model is configured)
+
 ## High-level architecture flow
 ```text
 Intent + LabelReading -> AnswerBuilder -> draft ResponsePlan -> rule engine -> TemplateRenderer -> Speaker

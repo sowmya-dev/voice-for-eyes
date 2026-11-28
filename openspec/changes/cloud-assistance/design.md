@@ -36,6 +36,11 @@ model = first available of: google/gemma-4-31b-it:free, nvidia/nemotron-3.5-supe
 - **Plain English:** The backend calls OpenRouter directly, so no separate LiteLLM service is needed. The prompt names LiteLLM, so this is recorded as a departure.
 - **Pseudo-technical:** `FastAPI POST /api/cloud -> httpx.post(OpenRouter) -> { text: choices[0].message.content }`
 
+### 6. One use of a medicine photo: Molmo points for a count
+- **Status:** Proposed (user, 2026-11-28: "Next in line is to try Molmo from Openrouter"). Nothing is built, and D11 stands until Molmo is adopted.
+- **Plain English:** Counting is the one medicine task where a cloud model may see the strip, and only to point at the tablets. The app counts the points itself and throws away anything else the model writes, so the model never tells the user anything about a medicine. Like every cloud use, it needs cloud assistance to be on.
+- **Pseudo-technical:** `browser sends cloudHelp with the count request; if POCKET_DETECTOR includes molmo and cloudHelp: OpenRouter chat/completions {model: allenai/molmo-2-8b:free, user: [text "Point to each pill that is still in the blister pack.", image]} -> points; else no photo leaves for OpenRouter and there is no second opinion`
+
 ## High-level architecture flow
 ```text
 browser: CloudGate -> /api/cloud -> FastAPI backend -> OpenRouter (free model)
@@ -74,6 +79,8 @@ local attempt first -> if the task is allowed and the gate passes, call the clou
 - Free models are limited to about 20 requests a minute and 50 a day (1,000 a day after buying $10 of credits); one source said 200. A demo can run out. Recommendation: answer "I can't describe that right now" on `rate_limited`.
 - Whether free-model providers log or train on prompts and images is not checked. Room photos may show private details.
 - Speech recognised in the cloud may turn out to be a dose question. Recommendation: allow transcription only and answer locally.
+- If Molmo is adopted, D11 becomes "surroundings, general questions, and pointing at tablets for a count". Record that as D17 in traceability then, not before.
+- On 2026-11-28 OpenRouter listed no provider serving Molmo, so this cannot be tried yet (label-image-processing, decision 20).
 
 ## Risks
 - A public server with a key could be abused. Mitigation: size and rate limits on /api/cloud.

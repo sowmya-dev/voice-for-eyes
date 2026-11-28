@@ -33,6 +33,11 @@ All decisions are **Proposed**. None is agreed until we brainstorm this change.
 - **Plain English:** Once the label is complete, the tablets are counted once without making the user wait, and the count is kept for "How many are left?". Saying a tablet was taken forgets it.
 - **Pseudo-technical:** `on complete: if countTablets: countTablets().then(c => label.count = c); on 'took': label.count = null`
 
+### 6. One background count per strip
+- **Status:** Proposed (the user reported on 2026-11-28 that the app still asks to show the strip again and again, then asked for spec only; not built)
+- **Plain English:** The silent count after a label is read was repeated after every answer for as long as it found nothing. That spent two strip-model calls each time and achieved nothing. It is tried once per strip; a new try needs a reason: the user took a tablet, asks for the count, or shows a different strip.
+- **Pseudo-technical:** `entry.countTried = true on the first background count; countInBackground() returns at once when entry.countTried; cleared on 'took', on a count question, and when mergeReading starts a new strip`
+
 ## High-level architecture flow
 ```text
 intent + current label -> memory lookup --hit--> rule engine -> speech

@@ -62,11 +62,15 @@ After a label is complete, the system SHALL answer medicine questions (expiry, d
 - **THEN** the answer comes from the remembered label
 
 ### Requirement: Count gathered with the label
-When a strip model is configured, the system SHALL count the visible tablets once, in the background, after a label becomes complete, keep the count with the remembered label, and answer a count question from it. The system SHALL forget the count when the user says they took a tablet.
+When a strip model is configured, the system SHALL count the visible tablets once, in the background, after a label becomes complete, keep the count with the remembered label, and answer a count question from it. The background count SHALL be tried once for a strip and not again after later answers about it; it SHALL be tried again only when the user says they took a tablet, asks for the count, or shows a different strip. The system SHALL forget the count when the user says they took a tablet.
 
 #### Scenario: Count remembered
 - **WHEN** the label was read, the count was accepted, and the user asks "How many are left?"
 - **THEN** the remembered count is given without reading the camera
+
+#### Scenario: No recount after each answer
+- **WHEN** the background count found nothing and the user asks two more questions about the same strip
+- **THEN** the strip model is not called again
 
 #### Scenario: Tablet taken
 - **WHEN** the user says they took a tablet

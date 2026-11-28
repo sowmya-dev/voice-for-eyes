@@ -11,7 +11,8 @@ const W = 320;
 const H = 240;
 
 // A high-contrast pattern, optionally shifted and blurred, as RGBA.
-function frame({ dx = 0, dy = 0, blur = 0 } = {}) {
+function frame({ dx = 0, dy = 0, blur = 0, angle = 0 } = {}) {
+  if (angle) return rotated(frame({ dx, dy, blur }), angle);
   const data = new Uint8ClampedArray(W * H * 4);
   for (let y = 0; y < H; y += 1) {
     for (let x = 0; x < W; x += 1) {
@@ -38,6 +39,31 @@ test('shaky capture: the five sharpest frames are aligned and averaged', () => {
   // Aligned frames average back to a crisp image; unaligned ones would smear it.
   const single = cleanFrames(cv, [frames[result.used[0]]]);
   assert.ok(result.averagedSharpness > single.averagedSharpness * 0.7, `${result.averagedSharpness} vs ${single.averagedSharpness}`);
+});
+
+// A frame turned by `angle` degrees about its centre, as a tilting hand would.
+function rotated(f, angle) {
+  const src = cv.matFromImageData(f);
+  const out = new cv.Mat();
+  const m = cv.getRotationMatrix2D(new cv.Point(W / 2, H / 2), angle, 1);
+  cv.warpAffine(src, out, m, new cv.Size(W, H), cv.INTER_LINEAR, cv.BORDER_REPLICATE);
+  const result = { width: W, height: H, data: new Uint8ClampedArray(out.data) };
+  [src, out, m].forEach((x) => x.delete());
+  return result;
+}
+
+test('tilting hand: frames turned by a few degrees are aligned before averaging', () => {
+  // Every frame is turned, so each is equally softened by the test's own resampling.
+  const frames = [frame({ angle: 1 }), frame({ angle: 4 }), frame({ angle: -2 }), frame({ angle: 5, dx: 2 }), frame({ angle: -3, dy: 2 })];
+  const result = cleanFrames(cv, frames);
+  const single = cleanFrames(cv, [frames[result.used[0]]]);
+  assert.ok(result.averagedSharpness > single.averagedSharpness * 0.7, `${result.averagedSharpness} vs ${single.averagedSharpness}`);
+});
+
+test('alignment fails: frames with nothing to line up still give three copies', () => {
+  const flat = () => ({ width: W, height: H, data: new Uint8ClampedArray(W * H * 4).fill(128) });
+  const result = cleanFrames(cv, [flat(), flat(), flat()]);
+  assert.equal(result.copies.length, 3);
 });
 
 test('three copies: averaged, enhanced at 2x, and binarised for embossed text', () => {

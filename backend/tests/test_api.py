@@ -8,7 +8,7 @@ from starlette.websockets import WebSocketDisconnect
 from app import main
 
 client = TestClient(main.app)
-KEYS = ["SARVAM_API_KEY", "OPENROUTER_API_KEY", "ROBOFLOW_PRIVATE_API_KEY", "ROBOFLOW_MODEL_ID"]
+KEYS = ["SARVAM_API_KEY", "OPENROUTER_API_KEY", "ROBOFLOW_PRIVATE_API_KEY", "ROBOFLOW_MODEL_ID", "ROBOFLOW_CLASS_MAP"]
 ORIGIN = {"origin": "http://testserver"}
 
 
@@ -50,6 +50,57 @@ def test_roboflow_predictions_become_boxes():
     ])
     assert found["strip"] == {"x": 70, "y": 60, "w": 60, "h": 40}
     assert (len(found["full"]), len(found["empty"])) == (1, 1)
+
+
+def box(name, x=100):
+    return {"class": name, "x": x, "y": 80, "width": 10, "height": 10, "confidence": 0.9}
+
+
+STRIP = {"class": "medicine_strip", "x": 100, "y": 80, "width": 60, "height": 40, "confidence": 0.9}
+
+
+def models(monkeypatch, replies: dict, ids: str, class_map: str = ""):
+    """Fake strip models: each id answers with its predictions, or raises when given an exception."""
+    monkeypatch.setenv("ROBOFLOW_PRIVATE_API_KEY", "k")
+    monkeypatch.setenv("ROBOFLOW_MODEL_ID", ids)
+    monkeypatch.setenv("ROBOFLOW_CLASS_MAP", class_map)
+    asked = []
+
+    def infer(image, model_id):
+        asked.append(model_id)
+        reply = replies[model_id]
+        if isinstance(reply, Exception):
+            raise reply
+        return {"predictions": reply}
+
+    monkeypatch.setattr(main, "infer_strip", infer)
+    return asked
+
+
+def test_first_model_finds_nothing_so_the_second_is_used(monkeypatch):
+    asked = models(monkeypatch, {"a/1": [], "b/2": [STRIP, box("full_cavity")]}, "a/1, b/2")
+    found = client.post("/api/vision/fallback", json={"imageJpeg": "aGk="}).json()
+    assert asked == ["a/1", "b/2"]
+    assert found["strip"] and len(found["full"]) == 1
+
+
+def test_a_failing_model_does_not_stop_the_next(monkeypatch):
+    models(monkeypatch, {"a/1": RuntimeError("down"), "b/2": [STRIP, box("full_cavity")]}, "a/1,b/2")
+    assert len(client.post("/api/vision/fallback", json={"imageJpeg": "aGk="}).json()["full"]) == 1
+
+
+def test_class_names_are_mapped_to_ours(monkeypatch):
+    theirs = [{**STRIP, "class": "strip"}, box("pill"), box("pill", 120), box("missing", 140)]
+    models(monkeypatch, {"x/2": theirs}, "x/2", "strip=medicine_strip, pill=full_cavity, missing=empty_cavity")
+    found = client.post("/api/vision/fallback", json={"imageJpeg": "aGk="}).json()
+    assert found["strip"] and (len(found["full"]), len(found["empty"])) == (2, 1)
+
+
+def test_no_model_finds_a_strip(monkeypatch):
+    models(monkeypatch, {"a/1": [box("cracked")], "b/2": []}, "a/1,b/2")
+    assert client.post("/api/vision/fallback", json={"imageJpeg": "aGk="}).json() == {"strip": None, "full": [], "empty": []}
+    models(monkeypatch, {"a/1": RuntimeError("down")}, "a/1")
+    assert client.post("/api/vision/fallback", json={"imageJpeg": "aGk="}).json() == {"error": "unavailable"}
 
 
 def test_cloud_takes_only_surroundings_and_general_questions(monkeypatch):

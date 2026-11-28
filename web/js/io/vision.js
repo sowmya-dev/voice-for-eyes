@@ -29,13 +29,15 @@ export function createVision(camera) {
     return ocr;
   }
 
-  async function readCopy(engine, copy) {
+  async function readCopy(engine, copy, turn = 0) {
+    const view = turn ? rotateCopy(copy, turn) : copy;
     // Finding text on a smaller image is much faster; the words are still read from the full-size copy.
-    const [result] = await engine.predict(new ImageData(new Uint8ClampedArray(copy.data), copy.width, copy.height), DETECTION);
-    // Boxes are mapped back to camera-frame pixels so every copy and the guidance share one scale.
+    const [result] = await engine.predict(new ImageData(new Uint8ClampedArray(view.data), view.width, view.height), DETECTION);
+    // Boxes are mapped back to upright camera-frame pixels so every copy, every turn and the guidance share one frame.
     return result.items.map((item) => {
-      const xs = item.poly.map((p) => (Array.isArray(p) ? p[0] : p.x) / copy.scale);
-      const ys = item.poly.map((p) => (Array.isArray(p) ? p[1] : p.y) / copy.scale);
+      const points = item.poly.map((p) => unrotate(Array.isArray(p) ? { x: p[0], y: p[1] } : p, turn, copy.width, copy.height));
+      const xs = points.map((p) => p.x / copy.scale);
+      const ys = points.map((p) => p.y / copy.scale);
       const x = Math.min(...xs);
       const y = Math.min(...ys);
       return { text: item.text, score: item.score, box: { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y } };
@@ -65,35 +67,81 @@ export function createVision(camera) {
     }
     const size = { width: frames[0].width, height: frames[0].height };
     const [engine, cleaned] = await Promise.all([loadOcr(), clean(frames)]);
-    const lines = [];
-    for (const copy of cleaned.copies) lines.push(await readCopy(engine, copy));
-    const reading = agree(lines.map(extractFields));
+    const { lines, reading } = await readOriented(cleaned.copies, (copy, turn) => readCopy(engine, copy, turn));
     // Guidance uses the copy that found the most text.
     reading.lines = lines.reduce((a, b) => (b.length > a.length ? b : a));
     reading.frame = size;
     return { reading, quality: cleaned.quality, frontCamera: camera.isFrontCamera() };
   }
 
-  // Counting uses the server-side strip model only when one is configured. Two copies must agree.
+  // Counting uses the server-side strip model only when one is configured. The model was trained on
+  // colour photos, so it gets the two sharpest frames as captured, not the black-and-white cleaned copies.
   async function countTablets() {
     const frames = await camera.grabFrames();
     if (!frames.length) return { count: null };
-    const size = { width: frames[0].width, height: frames[0].height };
-    const { copies } = await clean(frames);
-    const counts = [];
-    for (const copy of copies.filter((c) => c.kind !== 'binarised')) {
-      const found = await postFallback(await toJpeg(copy));
-      counts.push(reliableCount(found, copy.scale, size));
-    }
-    return { count: counts[0] !== null && counts.every((n) => n === counts[0]) ? counts[0] : null };
+    const colour = frames.map((f) => ({ ...f, data: new Uint8ClampedArray(f.data) })); // the worker takes the originals
+    const { used } = await clean(frames);
+    return { count: await countFrames(colour, used, async (frame) => postFallback(await toJpeg({ ...frame, scale: 1 }))) };
   }
 
   return { capture, countTablets, warmUp };
 }
 
-// A count needs the whole strip in view and at least one pocket found.
+// Two of the sharpest frames must give the same reliable count.
+export async function countFrames(frames, used, post) {
+  if (used.length < 2) return null;
+  const size = { width: frames[0].width, height: frames[0].height };
+  const counts = [];
+  for (const index of used.slice(0, 2)) counts.push(reliableCount(await post(frames[index]), 1, size));
+  return counts[0] !== null && counts[0] === counts[1] ? counts[0] : null;
+}
+
+// Reads every copy upright. Only when the name or expiry is missing, the enhanced copy is read at each
+// quarter turn, and every copy is read again at the turn that found the most confident text.
+export async function readOriented(copies, read) {
+  const upright = [];
+  for (const copy of copies) upright.push(await read(copy, 0));
+  const reading = agree(upright.map(extractFields));
+  if (reading.name && reading.expiry) return { lines: upright, reading };
+  const probe = copies.find((c) => c.kind === 'enhanced') ?? copies[0];
+  const tried = new Map([[0, upright[copies.indexOf(probe)]]]);
+  for (const turn of [1, 2, 3]) tried.set(turn, await read(probe, turn));
+  const best = [...tried.keys()].reduce((a, b) => (textWeight(tried.get(b)) > textWeight(tried.get(a)) ? b : a));
+  if (best === 0) return { lines: upright, reading };
+  const lines = [];
+  for (const copy of copies) lines.push(copy === probe ? tried.get(best) : await read(copy, best));
+  return { lines, reading: agree(lines.map(extractFields)) };
+}
+
+const textWeight = (lines) => lines.reduce((sum, l) => sum + l.score * l.text.trim().length, 0);
+
+// `turn` quarter turns clockwise. Pixels are moved as whole 32-bit RGBA values.
+export function rotateCopy(copy, turn) {
+  const { width: w, height: h } = copy;
+  const src = new Uint32Array(new Uint8ClampedArray(copy.data).buffer);
+  const out = new Uint32Array(w * h);
+  const ow = turn % 2 ? h : w;
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      const [nx, ny] = turn === 1 ? [h - 1 - y, x] : turn === 2 ? [w - 1 - x, h - 1 - y] : [y, w - 1 - x];
+      out[ny * ow + nx] = src[y * w + x];
+    }
+  }
+  return { ...copy, width: ow, height: turn % 2 ? w : h, data: new Uint8ClampedArray(out.buffer) };
+}
+
+// A point in a copy turned `turn` quarter turns clockwise, back in the upright copy of size width x height.
+export function unrotate({ x, y }, turn, width, height) {
+  if (turn === 1) return { x: y, y: height - x };
+  if (turn === 2) return { x: width - x, y: height - y };
+  if (turn === 3) return { x: width - y, y: x };
+  return { x, y };
+}
+
+// A count needs the whole strip in view and at least one full pocket, so a model that cannot see
+// tablets never reports zero.
 export function reliableCount(found, scale, size) {
-  if (!found?.strip || !(found.full.length + found.empty.length)) return null;
+  if (!found?.strip || !found.full.length) return null;
   const { x, y, w, h } = found.strip;
   const edge = 15;
   const whole = x / scale > edge && y / scale > edge && (x + w) / scale < size.width - edge && (y + h) / scale < size.height - edge;

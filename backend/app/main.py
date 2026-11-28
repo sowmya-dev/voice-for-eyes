@@ -214,12 +214,35 @@ def to_strip_result(predictions: list, minimum: float = 0.5) -> dict:
     return result
 
 
-def infer_strip(image: str) -> dict:
+def infer_strip(image: str, model_id: str) -> dict:
     from inference_sdk import InferenceHTTPClient  # imported on first use: it is large
 
     client = InferenceHTTPClient(api_url=env("ROBOFLOW_API_URL", "https://serverless.roboflow.com"),
                                  api_key=env("ROBOFLOW_PRIVATE_API_KEY"))
-    return client.infer(image, model_id=env("ROBOFLOW_MODEL_ID"))
+    return client.infer(image, model_id=model_id)
+
+
+def class_renames() -> dict:
+    """ROBOFLOW_CLASS_MAP="theirs=ours,..." lets a model with other class names be used."""
+    pairs = (p.split("=", 1) for p in env("ROBOFLOW_CLASS_MAP").split(",") if "=" in p)
+    return {theirs.strip(): ours.strip() for theirs, ours in pairs}
+
+
+async def detect_strip(image: str) -> dict:
+    """Models in ROBOFLOW_MODEL_ID are tried in order; the first that finds a strip with pockets wins."""
+    renames = class_renames()
+    result: dict = {"error": "unavailable"}
+    for model_id in [m.strip() for m in env("ROBOFLOW_MODEL_ID").split(",") if m.strip()]:
+        try:
+            reply = await run_in_threadpool(infer_strip, image, model_id)
+        except Exception as error:  # one model failing must not stop the next
+            log.warning("strip detection failed for one model: %s", type(error).__name__)
+            continue
+        predictions = [{**p, "class": renames.get(p.get("class"), p.get("class"))} for p in reply.get("predictions", [])]
+        result = to_strip_result(predictions)
+        if result["strip"] and (result["full"] or result["empty"]):
+            break
+    return result
 
 
 @app.post("/api/vision/fallback")
@@ -231,8 +254,7 @@ async def vision_fallback(request: ImageRequest):
     if too_many_calls():
         return {"error": "rate_limited"}
     try:
-        reply = await run_in_threadpool(infer_strip, request.imageJpeg)
-        return to_strip_result(reply.get("predictions", []))
+        return await detect_strip(request.imageJpeg)
     except Exception as error:  # the app must keep running whatever the service does
         log.warning("strip detection failed: %s", type(error).__name__)
         return {"error": "unavailable"}

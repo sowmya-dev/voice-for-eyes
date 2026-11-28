@@ -5,6 +5,12 @@ Turns camera frames into trusted label fields. `mvp/VoiceLoop.kt` returns a hard
 
 **As built (2026-11-28):** Built: 7 frames, top 5 by Laplacian variance, shift-only alignment by template match, bilateral filter (OpenCV.js has no non-local-means), CLAHE, unsharp mask, 2x, adaptive threshold, in a web worker; PP-OCRv5 Mobile through `@paddleocr/paddleocr-js` with detection capped at 736 px on 4 WASM threads. On a 12-thread laptop in headless Chrome one read takes about 10 s (about 2.5 s per copy). Not built: the YOLOv8n model (no trained weights). The Roboflow projects checked on 2026-11-28 cannot count tablets: SASTRA blister_pack_28th_aug_2023 v1 has only defect and empty-pocket classes, blister packet identification has 3 images and no model, and blister-pack-9t2sb is labelled by drug name. The fallback endpoint is built but stays off until ROBOFLOW_MODEL_ID names a model with the classes medicine_strip, full_cavity and empty_cavity.
 
+**Fallbacks for turned, shaken and uncounted strips (2026-11-28):** built at the user's request ("Fix things now"); decisions 12-16 below. Causes found on 2026-11-28, from the code (no captured frames were available):
+- OCR (PP-OCRv5 mobile det + rec) has no orientation step, so it reads only upright text lines. Taking a photo re-runs the same OCR, so it fails the same way.
+- Frames were aligned by shift only (`cleanup.js`, marked as a shortcut), so a tilting hand blurred the averaged copy.
+- Counting sent the cleaned black-and-white copies (one upscaled 2x) to a model trained on colour photos.
+- The configured model `blister-strips-defect-detection/2` has the classes `strip`, `missing`, `broken`, `cracked`. None matched ours, so every prediction was dropped. It has no full-pocket class, so no renaming can make it count.
+
 ## Design decisions
 All decisions are **Proposed**. None is agreed until we brainstorm this change.
 
@@ -80,6 +86,31 @@ camera cues: "hold the phone still" (motion blur), "please wipe the camera lens"
 - **Plain English:** YOLOv8n in the browser comes first. If it cannot give a result, the backend sends the frame to the SASTRA blister classification and segmentation models on Roboflow. They only find the strip and pockets; the name and expiry are still read by PaddleOCR on the phone.
 - **Pseudo-technical:** `result = yolo.detect(copy); if result is unavailable (model failed to load, error, or no medicine_strip while the camera check passes): result = POST /api/vision/fallback -> FastAPI -> inference_sdk.InferenceHTTPClient(api_key=env ROBOFLOW_API_KEY).infer(frame, model_id) -> mapped to StripDetection; two-copy count agreement still applies`
 
+### 12. Turned copies only when the upright read is incomplete
+- **Status:** Agreed (user, 2026-11-28)
+- **Plain English:** If the name or expiry is missing, the app tries the label turned a quarter, half and three-quarters of the way round, keeps the turn that finds the most confident text, and reads every copy at that turn. A label read upright costs nothing extra.
+- **Pseudo-technical:** `if !(reading.name && reading.expiry): best = argmax_k sum(score*len) over OCR(rotate(enhanced, k)) for k in {1,2,3}; if best beats upright: re-read all copies at k; boxes mapped back with unrotate(point, k, w, h)`
+
+### 13. Mirror images are not tried
+- **Status:** Agreed (user, 2026-11-28)
+- **Plain English:** "Flipped" means turned over or upside down. Turning over shows the other side, which is a different label, and upside down is the 180 degree turn. The camera never mirrors frames, so mirrored text cannot occur.
+- **Pseudo-technical:** `orientations = {0, 90, 180, 270}; no horizontal flip`
+
+### 14. Rotation-aware alignment with a safe fallback
+- **Status:** Agreed (user, 2026-11-28)
+- **Plain English:** Frames are lined up for small turns as well as shifts. If that fails, the old shift-only lining up is used.
+- **Pseudo-technical:** `warp = translation from matchTemplate; try findTransformECC(MOTION_EUCLIDEAN, init=warp, 50 iterations, 1e-4) on the 320px copy, scale the shift back; catch -> translation only`
+
+### 15. Colour frames for counting
+- **Status:** Agreed (user, 2026-11-28)
+- **Plain English:** The strip model gets the two sharpest camera frames as they were captured, in colour, and both must give the same count.
+- **Pseudo-technical:** `frames copied before transfer to the cleanup worker; send frames[used[0]], frames[used[1]] as JPEG; count = c0 if c0 != null and c0 == c1`
+
+### 16. Model chain with class renaming, and no count without a full pocket
+- **Status:** Agreed (user, 2026-11-28)
+- **Plain English:** Several strip models can be listed and are tried in order. Their class names can be renamed to ours. A count is only spoken when at least one full pocket is seen, so a model that cannot see tablets can never say "zero".
+- **Pseudo-technical:** `for model in ROBOFLOW_MODEL_ID.split(','): r = to_strip_result(rename(predictions, ROBOFLOW_CLASS_MAP)); if r.strip and (r.full or r.empty): return r; reliableCount requires full.length >= 1`
+
 ## High-level architecture flow
 ```text
 camera frames -> sharpness ranking -> top 5 -> align + average -> [averaged]
@@ -150,6 +181,9 @@ On a turn that needs the label: collect frames -> select -> clean -> read each c
 - The "slowly" margin, the haze and motion limits, and the 15 px and 20% values: set from test photos.
 - `ingredient` is needed for the purpose lookup but is not in the prompt's list of agreed fields. Recommendation: require two-copy agreement for it too.
 - The rule for building labelId is shared with session-memory. Recommendation: derive it from the accepted name and expiry.
+- Whether a cloud vision model (OpenRouter or Claude) should be a last fallback for counting. That would reverse D11 ("medicine questions never go to the cloud"); the user asked not to use Claude for now.
+- Whether counting should also try turned frames. Detection models are usually trained with rotations, and each try uses a rate-limited call.
+- A strip model with full and empty pocket classes is still needed; the current model cannot count.
 
 ## Risks
 - The fallback sends medicine photos off the phone to Roboflow, and needs a network and a key.
@@ -157,3 +191,6 @@ On a turn that needs the label: collect frames -> select -> clean -> read each c
 - Foil glare can look like an empty pocket. Mitigation: test glared strips.
 - All copies come from the same frames, so they can agree on the same misread. Mitigation: test on strips with known values.
 - OpenCV.js and OCR may be too slow in a phone browser. Prerequisite spike: measure time and accuracy on sample strips.
+- Reading turned copies adds up to six OCR runs on the failure path, which is slow on low-end phones.
+- ECC can converge to a wrong alignment on low-texture frames; the averaged copy may then be blurrier. The sharpest frame still leads the average.
+- Each listed model is a separate Roboflow call, so a long list is slower and uses more credits.

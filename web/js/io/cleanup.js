@@ -28,7 +28,9 @@ function laplacianVariance(cv, gray) {
   });
 }
 
-// shortcut: shifts only (template match), no rotation; move to findTransformECC if tilted shake blurs the average.
+const ECC_ITERATIONS = 50;
+const ECC_EPSILON = 1e-4;
+
 function shrink(cv, gray, scale, keep) {
   if (scale === 1) return gray;
   const small = keep(new cv.Mat());
@@ -51,10 +53,18 @@ function alignTo(cv, reference, gray) {
       gray.copyTo(out);
       return out;
     }
-    const dx = (x - best.maxLoc.x) / scale;
-    const dy = (y - best.maxLoc.y) / scale;
-    const shift = keep(cv.matFromArray(2, 3, cv.CV_64F, [1, 0, dx, 0, 1, dy]));
-    cv.warpAffine(gray, out, shift, new cv.Size(gray.cols, gray.rows), cv.INTER_LINEAR, cv.BORDER_REPLICATE);
+    // The shift seeds a turn-and-shift (Euclidean) refinement; the warp maps reference points to frame points.
+    const warp = keep(cv.matFromArray(2, 3, cv.CV_32F, [1, 0, best.maxLoc.x - x, 0, 1, best.maxLoc.y - y]));
+    try {
+      const criteria = new cv.TermCriteria(cv.TermCriteria_COUNT + cv.TermCriteria_EPS, ECC_ITERATIONS, ECC_EPSILON);
+      cv.findTransformECC(smallReference, shrink(cv, gray, scale, keep), warp, cv.MOTION_EUCLIDEAN, criteria, keep(new cv.Mat()), 5);
+    } catch {
+      // No turn could be worked out (for example a plain frame): keep the shift alone.
+      warp.data32F.set([1, 0, best.maxLoc.x - x, 0, 1, best.maxLoc.y - y]);
+    }
+    const [a, b, tx, c, d, ty] = warp.data32F;
+    const full = keep(cv.matFromArray(2, 3, cv.CV_64F, [a, b, tx / scale, c, d, ty / scale]));
+    cv.warpAffine(gray, out, full, new cv.Size(gray.cols, gray.rows), cv.INTER_CUBIC + cv.WARP_INVERSE_MAP, cv.BORDER_REPLICATE);
     return out;
   });
 }

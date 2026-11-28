@@ -81,19 +81,26 @@ export function createVision(camera) {
     if (!frames.length) return { count: null };
     const colour = frames.map((f) => ({ ...f, data: new Uint8ClampedArray(f.data) })); // the worker takes the originals
     const { used } = await clean(frames);
-    return { count: await countFrames(colour, used, async (frame) => postFallback(await toJpeg({ ...frame, scale: 1 }))) };
+    return countFrames(colour, used, async (frame) => postFallback(await toJpeg({ ...frame, scale: 1 })));
   }
 
   return { capture, countTablets, warmUp };
 }
 
-// Two of the sharpest frames must give the same reliable count.
+// Two of the sharpest frames must agree: on the full pockets of a whole strip (count), or on the number of
+// used, empty pockets (empty) for a model that cannot see full ones. No empty pocket is not reported:
+// it cannot be told apart from no strip in view.
 export async function countFrames(frames, used, post) {
-  if (used.length < 2) return null;
+  if (used.length < 2) return { count: null, empty: null };
   const size = { width: frames[0].width, height: frames[0].height };
-  const counts = [];
-  for (const index of used.slice(0, 2)) counts.push(reliableCount(await post(frames[index]), 1, size));
-  return counts[0] !== null && counts[0] === counts[1] ? counts[0] : null;
+  const found = [];
+  for (const index of used.slice(0, 2)) found.push(await post(frames[index]));
+  const counts = found.map((f) => reliableCount(f, 1, size));
+  const empties = found.map((f) => f?.empty?.length ?? null);
+  return {
+    count: counts[0] !== null && counts[0] === counts[1] ? counts[0] : null,
+    empty: empties[0] > 0 && empties[0] === empties[1] ? empties[0] : null,
+  };
 }
 
 // Reads every copy upright and keeps what it finds. A strip can print the name along its length and the

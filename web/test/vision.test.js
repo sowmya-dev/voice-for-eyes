@@ -98,13 +98,27 @@ const pockets = (n) => ({ strip, full: Array(n).fill(box), empty: [] });
 
 test('Counted from colour frames: the two sharpest original frames are sent and agree', async () => {
   const sent = [];
-  const count = await countFrames(colourFrames, [2, 0, 1], async (f) => { sent.push(f); return pockets(4); });
+  const { count } = await countFrames(colourFrames, [2, 0, 1], async (f) => { sent.push(f); return pockets(4); });
   assert.equal(count, 4);
   assert.deepEqual(sent.map((f) => f.i), [2, 0]);
   assert.ok(sent.every((f) => f.data instanceof Uint8ClampedArray && f.width === 1280), 'original-size colour frames');
 });
 
 test('Frames disagree: no count is accepted', async () => {
-  assert.equal(await countFrames(colourFrames, [0, 1], async (f) => pockets(f.i ? 5 : 4)), null);
-  assert.equal(await countFrames(colourFrames, [0, 1], async () => null), null);
+  assert.equal((await countFrames(colourFrames, [0, 1], async (f) => pockets(f.i ? 5 : 4))).count, null);
+  assert.deepEqual(await countFrames(colourFrames, [0, 1], async () => null), { count: null, empty: null });
+});
+
+// A model with only used-cell detections (no strip, no full pockets): empty pockets must agree too.
+const used = (n) => ({ strip: null, full: [], empty: Array(n).fill(box) });
+
+test('Empty pockets agree: reported with no full-pocket count', async () => {
+  for (const n of [1, 3, 9]) assert.deepEqual(await countFrames(colourFrames, [0, 1], async () => used(n)), { count: null, empty: n });
+});
+
+test('Empty pockets disagree, or none seen: nothing reported', async () => {
+  assert.equal((await countFrames(colourFrames, [0, 1], async (f) => used(f.i ? 2 : 3))).empty, null);
+  assert.equal((await countFrames(colourFrames, [0, 1], async () => used(0))).empty, null, 'no empty pocket may mean no strip in view');
+  assert.equal((await countFrames(colourFrames, [0, 1], async (f) => (f.i ? null : used(2)))).empty, null);
+  assert.deepEqual(await countFrames(colourFrames, [0], async () => used(2)), { count: null, empty: null }, 'two frames are needed');
 });

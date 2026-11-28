@@ -202,7 +202,7 @@ class ImageRequest(BaseModel):
     imageJpeg: str = Field(min_length=1, max_length=MAX_IMAGE_CHARS)
 
 
-def to_strip_result(predictions: list, minimum: float = 0.5) -> dict:
+def to_strip_result(predictions: list, minimum: float = 0.7) -> dict:
     """Roboflow boxes are centre based. Only the agreed class names count; anything else is ignored."""
     result: dict = {"strip": None, "full": [], "empty": []}
     for p in sorted(predictions, key=lambda p: -p.get("confidence", 0)):
@@ -231,7 +231,7 @@ def class_renames() -> dict:
 
 
 async def detect_strip(image: str) -> dict:
-    """Models in ROBOFLOW_MODEL_ID are tried in order; the first that finds a strip with pockets wins."""
+    """Models in ROBOFLOW_MODEL_ID are tried in order; the first that finds full or empty pockets wins."""
     renames = class_renames()
     result: dict = {"error": "unavailable"}
     for model_id in [m.strip() for m in env("ROBOFLOW_MODEL_ID").split(",") if m.strip()]:
@@ -242,7 +242,7 @@ async def detect_strip(image: str) -> dict:
             continue
         predictions = [{**p, "class": renames.get(p.get("class"), p.get("class"))} for p in reply.get("predictions", [])]
         result = to_strip_result(predictions)
-        if result["strip"] and (result["full"] or result["empty"]):
+        if result["full"] or result["empty"]:  # a model with only empty cells still helps (printed total - used)
             break
     return result
 

@@ -81,6 +81,18 @@ function expiryAnswer(label, today) {
   return [date, years === 1 ? seg('expiry.good_year') : seg('expiry.good_years', { n: years })];
 }
 
+// A count is the full pockets seen, or the printed total minus the used (empty) pockets seen, said with
+// how it was worked out. Never more used than the strip holds.
+function countFrom(result, label) {
+  if (result?.count != null) {
+    return { n: result.count, segments: [result.count === 1 ? seg('count.visible_one') : seg('count.visible', { n: result.count })] };
+  }
+  const total = label?.packCount;
+  const empty = result?.empty;
+  if (empty == null || !total || empty > total) return null;
+  return { n: total - empty, segments: [seg('count.from_pack', { total, empty, n: total - empty })] };
+}
+
 function composeMedicine(intent, label, today) {
   const plan = { intent: intent.name, aspect: intent.aspect, medicine: true, segments: [] };
   const name = label.name ? seg('id.name', { name: label.name }) : seg('unreadable.name');
@@ -275,7 +287,10 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
     const entry = remembered();
     if (!ports.countTablets || !entry || entry.count !== undefined || entry.counting) return;
     entry.counting = ports.countTablets()
-      .then((result) => { if (result?.count != null) entry.count = result.count; })
+      .then((result) => {
+        const counted = countFrom(result, entry.reading);
+        if (counted) Object.assign(entry, { count: counted.n, countSegments: counted.segments });
+      })
       .catch(() => {})
       .finally(() => { entry.counting = null; });
   }
@@ -385,7 +400,8 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
   }
 
   // ---------- counting ----------
-  const countOnce = async () => (ports.countTablets ? (await ports.countTablets())?.count ?? null : null);
+  const countOnce = async () => (ports.countTablets ? (await ports.countTablets()) ?? null : null);
+  const labelNow = (fallback) => state.label?.reading ?? fallback;
 
   async function count(turn, ctx) {
     const known = remembered();
@@ -393,26 +409,34 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
     if (stale(turn)) return;
     if (known && typeof known.count === 'number' && complete(known.reading, today())) {
       const n = known.count;
-      const segment = n === 1 ? seg('count.visible_one') : seg('count.visible', { n });
-      return deliver({ intent: 'identify', aspect: 'count', medicine: true, segments: [segment] }, known.reading, turn, { ...ctx, count: n });
+      const segments = known.countSegments ?? [n === 1 ? seg('count.visible_one') : seg('count.visible', { n })];
+      return deliver({ intent: 'identify', aspect: 'count', medicine: true, segments }, known.reading, turn, { ...ctx, count: n });
     }
     look(ctx.asked);
     const { reading: label } = await capture();
     if (stale(turn)) return;
-    let seen = await countOnce();
+    let result = await countOnce();
+    let counted = countFrom(result, labelNow(label));
     // With no counter available, asking the user to move the strip cannot help.
-    for (let asked = 0; seen === null && ports.countTablets && asked < MAX_ATTEMPTS; asked += 1) {
-      await prompt([seg('count.show_strip')], { screen: '5', tone: 'blur', asked: ctx.asked, cue: 'show_strip', attempt: asked + 1 });
+    for (let asked = 0; !counted && ports.countTablets && asked < MAX_ATTEMPTS; asked += 1) {
+      // Used cells are seen but not how many the strip holds: read the printed side, then work it out.
+      const needTotal = result?.empty != null && !labelNow(label).packCount;
+      const cue = needTotal ? [seg('count.need_total', { empty: result.empty })] : [seg('count.show_strip')];
+      await prompt(cue, { screen: '5', tone: 'blur', asked: ctx.asked, cue: needTotal ? 'show_print' : 'show_strip', attempt: asked + 1 });
       if (stale(turn)) return;
       await ports.sleep(MOVE_WAIT_MS);
       if (stale(turn)) return;
-      seen = await countOnce();
+      if (needTotal) await capture(); // the pack size joins the remembered label
+      else result = await countOnce();
+      if (stale(turn)) return;
+      counted = countFrom(result, labelNow(label));
     }
     if (stale(turn)) return;
-    if (seen !== null && state.label) state.label.count = seen;
-    const segment = seen === null ? seg('count.give_up') : seen === 1 ? seg('count.visible_one') : seg('count.visible', { n: seen });
-    await deliver({ intent: 'identify', aspect: 'count', medicine: true, segments: [segment] }, label, turn, { ...ctx, count: seen });
-    if (seen !== null) await offerNext(label, turn);
+    const seen = counted?.n ?? null;
+    if (counted && state.label) Object.assign(state.label, { count: counted.n, countSegments: counted.segments });
+    const segments = counted ? counted.segments : [seg('count.give_up')];
+    await deliver({ intent: 'identify', aspect: 'count', medicine: true, segments }, labelNow(label), turn, { ...ctx, count: seen });
+    if (seen !== null) await offerNext(labelNow(label), turn);
   }
 
   // ---------- safety events ----------
@@ -448,13 +472,13 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
     if (intent.aspect === 'unwell') return urgent('unwell', [seg('help.unwell')], turn, ctx);
     const plan = (segments, medicineAnswer = true) => ({ intent: 'safety', aspect: intent.aspect, medicine: medicineAnswer, segments });
     if (intent.aspect === 'which_take') return deliver(plan([seg('rec.none')], false), null, turn, ctx);
-    if (['took', 'took_more'].includes(intent.aspect) && state.label) state.label.count = undefined; // the strip has changed
+    if (['took', 'took_more'].includes(intent.aspect) && state.label) Object.assign(state.label, { count: undefined, countSegments: undefined }); // the strip has changed
     look(ctx.asked);
     const { reading: label } = await capture();
     if (stale(turn)) return;
     if (intent.aspect === 'took') return deliver(plan([seg('took.ack')]), label, turn, ctx);
     if (intent.aspect === 'took_more') {
-      const left = await countOnce();
+      const left = countFrom(await countOnce(), label)?.n ?? null;
       if (stale(turn)) return;
       const counted = left === null ? seg('more.cant_tell') : left === 1 ? seg('count.visible_one') : seg('count.visible', { n: left });
       return deliver(plan([saidTaken(ctx.text), counted, seg('more.advise')]), label, turn, { ...ctx, count: left });

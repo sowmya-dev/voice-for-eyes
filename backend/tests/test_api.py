@@ -96,6 +96,16 @@ def test_class_names_are_mapped_to_ours(monkeypatch):
     assert found["strip"] and (len(found["full"]), len(found["empty"])) == (2, 1)
 
 
+def test_a_model_that_sees_only_used_cells_is_accepted(monkeypatch):
+    # blister-strips-defect-detection/2: "missing" is an empty cell; it has no strip or full-pocket class.
+    theirs = [{**box("missing"), "confidence": 0.9}, {**box("missing", 140), "confidence": 0.75},
+              {**box("missing", 180), "confidence": 0.6}, box("cracked")]
+    asked = models(monkeypatch, {"a/2": theirs, "b/1": [STRIP, box("full_cavity")]}, "a/2,b/1", "missing=empty_cavity")
+    found = client.post("/api/vision/fallback", json={"imageJpeg": "aGk="}).json()
+    assert asked == ["a/2"], "empty pockets alone are enough"
+    assert (found["strip"], len(found["full"]), len(found["empty"])) == (None, 0, 2), "below 0.7 is ignored"
+
+
 def test_no_model_finds_a_strip(monkeypatch):
     models(monkeypatch, {"a/1": [box("cracked")], "b/2": []}, "a/1,b/2")
     assert client.post("/api/vision/fallback", json={"imageJpeg": "aGk="}).json() == {"strip": None, "full": [], "empty": []}

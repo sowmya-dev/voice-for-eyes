@@ -34,18 +34,27 @@ function findName(rows) {
     .join(' ');
 }
 
+// How many the strip holds, as printed: "Strip of 10", "1 x 10" or "10x10 Tablets" (the per-strip number),
+// or "10 Tablets". "IP" after the word is a pharmacopoeia mark, not a count.
+export function packSize(text) {
+  const m = text.match(/\b(?:strip|pack) of (\d{1,3})\b/i)
+    ?? text.match(/(?<![\d.\w])\d{1,2}\s*[x×]\s*(\d{1,3})(?![\d.])(?!\s*(?:cm|mm|ml|g)\b)/i)
+    ?? text.match(/(?<![\d.])(\d{1,3})\s*(?:tablets|tabs?|capsules|caps?)\b(?!\s*ip\b)/i);
+  const n = m ? Number(m[1]) : 0;
+  return n > 0 ? n : null;
+}
+
 export function extractFields(ocrLines) {
   const lines = ocrLines.filter((l) => l.score >= MIN_SCORE && l.text.trim());
   const rows = toRows(lines);
   const all = rows.map((r) => r.text).join('\n');
   const first = (test) => rows.find((r) => test.test(r.text.trim()))?.text.trim() ?? null;
-  const pack = all.match(/(?<![\d.])(\d{1,3})\s*(?:tablets|tabs|capsules|caps)\b(?!\s*ip\b)/i);
   return {
     name: findName(rows),
     ingredient: findIngredient(all),
     expiry: rows.reduce((found, r) => found ?? parseExpiry(r.text), null),
     dosage: first(/^(dosage|dose)\b/i),
-    packCount: pack ? Number(pack[1]) : null,
+    packCount: packSize(all),
     warnings: rows.filter((r) => /^(warning|caution)\b/i.test(r.text.trim())).map((r) => r.text.trim()),
     nutrition: rows.filter((r) => NUTRITION.test(r.text.trim())).map((r) => r.text.trim()),
   };

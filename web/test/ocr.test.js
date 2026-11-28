@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { extractFields, toRows } from '../js/core/label.js';
-import { readCloud } from '../js/io/vision.js';
+import { readCloud, readWith } from '../js/io/vision.js';
 
 const PAGE = JSON.parse(readFileSync(new URL('./fixtures/vision_page.json', import.meta.url), 'utf8'));
 const copy = (page) => JSON.parse(JSON.stringify(page));
@@ -84,4 +84,40 @@ test('one frame only: no cloud call, the device reader is used', async () => {
   let calls = 0;
   assert.equal(await readCloud(frames, [0], async () => { calls += 1; return [PAGE]; }, encode), null);
   assert.equal(calls, 0);
+});
+
+// ---------- swappable text readers ----------
+function readers(googleResult) {
+  const calls = [];
+  return {
+    calls,
+    table: {
+      google: async () => { calls.push('google'); return googleResult; },
+      device: async () => { calls.push('device'); return { lines: [], reading: { name: 'from device' } }; },
+    },
+  };
+}
+
+test('the chosen reader is used when it gives a result', async () => {
+  const r = readers({ lines: [], reading: { name: 'from google' } });
+  assert.equal((await readWith(r.table, 'google')).reading.name, 'from google');
+  assert.deepEqual(r.calls, ['google']);
+});
+
+test('the device reader takes over when the chosen reader gives nothing', async () => {
+  const r = readers(null);
+  assert.equal((await readWith(r.table, 'google')).reading.name, 'from device');
+  assert.deepEqual(r.calls, ['google', 'device']);
+});
+
+test('Device reader chosen: the cloud reader is never called', async () => {
+  const r = readers({ lines: [], reading: { name: 'from google' } });
+  assert.equal((await readWith(r.table, 'device')).reading.name, 'from device');
+  assert.deepEqual(r.calls, ['device']);
+});
+
+test('a reader the browser does not know falls back to the device', async () => {
+  const r = readers({ lines: [], reading: { name: 'from google' } });
+  assert.equal((await readWith(r.table, 'tesseract')).reading.name, 'from device');
+  assert.deepEqual(r.calls, ['device']);
 });

@@ -10,7 +10,7 @@ from app import main
 
 client = TestClient(main.app)
 KEYS = ["SARVAM_API_KEY", "OPENROUTER_API_KEY", "ROBOFLOW_PRIVATE_API_KEY", "ROBOFLOW_MODEL_ID", "ROBOFLOW_CLASS_MAP",
-        "GOOGLE_CLOUD_VISION_API_KEY"]
+        "GOOGLE_CLOUD_VISION_API_KEY", "TEXT_READER", "POCKET_DETECTOR"]
 ORIGIN = {"origin": "http://testserver"}
 
 
@@ -23,19 +23,19 @@ def no_keys(monkeypatch):
 
 
 def test_starts_without_keys_and_says_what_is_missing():
-    assert client.get("/api/status").json() == {"voice": False, "cloud": False, "visionFallback": False, "cloudOcr": False}
-    assert client.post("/api/ocr", json={"images": ["aGk="]}).json() == {"error": "key_not_set"}
+    assert client.get("/api/status").json() == {"voice": False, "cloud": False, "visionFallback": False, "textReader": "device"}
+    assert client.post("/api/ocr", json={"images": ["aGk="]}).json() == {"error": "off"}
     assert client.get("/api/cloud/status").json() == {"keyConfigured": False}
     assert client.post("/api/cloud", json={"task": "general", "lang": "en", "text": "who is Gandhi"}).json() == {"error": "key_not_set"}
     assert client.post("/api/vision/fallback", json={"imageJpeg": "aGk="}).json() == {"error": "key_not_set"}
 
 
 def test_keys_never_appear_in_responses(monkeypatch):
-    for name in KEYS:
+    for name in KEYS[:6]:
         monkeypatch.setenv(name, f"secret-{name}")
     body = client.get("/api/status").text + client.get("/api/cloud/status").text
     assert "secret" not in body
-    assert client.get("/api/status").json() == {"voice": True, "cloud": True, "visionFallback": True, "cloudOcr": True}
+    assert client.get("/api/status").json() == {"voice": True, "cloud": True, "visionFallback": True, "textReader": "google"}
 
 
 def test_fallback_needs_a_model_id_so_no_photo_leaves_by_default(monkeypatch):
@@ -340,3 +340,53 @@ def test_ocr_takes_one_or_two_images_only(monkeypatch):
     ocr_with(monkeypatch, [VISION])
     assert client.post("/api/ocr", json={"images": []}).status_code == 422
     assert client.post("/api/ocr", json={"images": ["aGk="] * 3}).status_code == 422
+
+
+# ---------- swappable engines ----------
+def test_device_reader_chosen_never_calls_cloud_vision(monkeypatch):
+    sent = ocr_with(monkeypatch, [VISION])
+    monkeypatch.setenv("TEXT_READER", "device")
+    assert client.get("/api/status").json()["textReader"] == "device"
+    assert client.post("/api/ocr", json={"images": ["aGk="]}).json() == {"error": "off"}
+    assert sent == []
+
+
+def test_reader_default_follows_the_vision_key(monkeypatch):
+    assert client.get("/api/status").json()["textReader"] == "device"
+    monkeypatch.setenv("GOOGLE_CLOUD_VISION_API_KEY", "k")
+    assert client.get("/api/status").json()["textReader"] == "google"
+    monkeypatch.setenv("TEXT_READER", "google")
+    monkeypatch.delenv("GOOGLE_CLOUD_VISION_API_KEY")
+    assert client.get("/api/status").json()["textReader"] == "device", "google without its key cannot run"
+
+
+def test_detector_off_sends_nothing_to_roboflow(monkeypatch):
+    asked = models(monkeypatch, {"a/1": [STRIP, box("full_cavity")]}, "a/1")
+    monkeypatch.setenv("POCKET_DETECTOR", "none")
+    assert client.get("/api/status").json()["visionFallback"] is False
+    assert client.post("/api/vision/fallback", json={"imageJpeg": "aGk="}).json() == {"error": "off"}
+    assert asked == []
+
+
+def test_unknown_engine_name_uses_the_default_and_is_logged(monkeypatch, caplog):
+    ocr_with(monkeypatch, [VISION])
+    monkeypatch.setenv("TEXT_READER", "tesseract")
+    main.warned.clear()
+    with caplog.at_level("WARNING"):
+        assert client.get("/api/status").json()["textReader"] == "google"
+        assert "pages" in client.post("/api/ocr", json={"images": ["aGk="]}).json()
+    assert "TEXT_READER=tesseract" in caplog.text
+
+
+def test_engines_shown_keys_hidden(monkeypatch):
+    ocr_with(monkeypatch, [VISION])
+    models(monkeypatch, {"a/1": []}, "a/1")
+    reply = client.get("/api/status")
+    assert reply.json() == {"voice": False, "cloud": False, "visionFallback": True, "textReader": "google"}
+    assert "secret-vision-key" not in reply.text
+
+
+def test_every_engine_has_the_same_adapter_shape():
+    for registry in (main.TEXT_READERS, main.POCKET_DETECTORS):
+        for engine in registry.values():
+            assert isinstance(engine, main.Engine) and callable(engine.problem) and callable(engine.run)

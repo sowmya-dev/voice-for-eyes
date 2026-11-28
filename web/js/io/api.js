@@ -1,5 +1,5 @@
 // Calls to the app server. Keys live there; the browser only learns whether they are set.
-const NOTHING = { voice: false, cloud: false, visionFallback: false, cloudOcr: false, reachable: false };
+const NOTHING = { voice: false, cloud: false, visionFallback: false, textReader: 'device', reachable: false };
 
 export async function getStatus() {
   try {

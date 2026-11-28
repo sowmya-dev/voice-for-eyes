@@ -37,7 +37,7 @@ const saveSettings = () => {
 };
 
 const strings = await fetch('/strings.json').then((r) => r.json());
-let status = { voice: false, cloud: false, visionFallback: false, cloudOcr: false, reachable: false };
+let status = { voice: false, cloud: false, visionFallback: false, textReader: 'device', reachable: false };
 let view = blankView('en');
 const flags = { camera: null, mic: null, voice: null, ocr: 'loading', noVoice: false, needsTap: false, reading: false };
 const ui = { settings, panel: 'answer', muted: false, torchOn: false, partial: '', keyNotSet: false, notices: [], cameraState: 'off' };
@@ -68,7 +68,7 @@ function redraw() {
 }
 
 const camera = createCamera(document.getElementById('video'));
-const vision = createVision(camera, { cloudOcr: () => status.cloudOcr && navigator.onLine });
+const vision = createVision(camera, { textReader: () => (navigator.onLine ? status.textReader : 'device') });
 const tts = createTts({
   settings,
   fetchSpeech,

@@ -15,7 +15,7 @@ import re
 import time
 import wave
 from collections import deque
-from typing import Literal
+from typing import Awaitable, Callable, Literal, NamedTuple
 from urllib.parse import urlsplit
 
 import httpx
@@ -55,14 +55,49 @@ def env(name: str, default: str = "") -> str:
     return os.environ.get(name, "").strip() or default
 
 
-def roboflow_ready() -> bool:
-    return bool(env("ROBOFLOW_PRIVATE_API_KEY") and env("ROBOFLOW_MODEL_ID"))
+def roboflow_problem() -> str | None:
+    if not env("ROBOFLOW_PRIVATE_API_KEY"):
+        return "key_not_set"
+    return None if env("ROBOFLOW_MODEL_ID") else "not_configured"
+
+
+# ---------- swappable vision engines ----------
+class Engine(NamedTuple):
+    """One adapter: why it cannot run now (None when it can), and the call itself."""
+    problem: Callable[[], str | None]
+    run: Callable[..., Awaitable]
+
+
+warned: set = set()
+
+
+def pick(setting: str, registry: dict, off: str, default: str) -> str:
+    """The engine named in a setting, or the default when the name is unknown (logged once)."""
+    name = env(setting).lower() or default
+    if name != off and name not in registry:
+        if (setting, name) not in warned:
+            warned.add((setting, name))
+            log.warning("%s=%s is not one of %s; using %s", setting, name, sorted([*registry, off]), default)
+        name = default
+    return name
+
+
+def text_reader() -> str:
+    """TEXT_READER: google (Cloud Vision on the server) or device (PaddleOCR in the browser), as actually usable."""
+    name = pick("TEXT_READER", TEXT_READERS, "device", "google" if env("GOOGLE_CLOUD_VISION_API_KEY") else "device")
+    return name if name == "device" or TEXT_READERS[name].problem() is None else "device"
+
+
+def pocket_detector() -> str:
+    """POCKET_DETECTOR: roboflow (YOLO models in ROBOFLOW_MODEL_ID) or none."""
+    return pick("POCKET_DETECTOR", POCKET_DETECTORS, "none", "roboflow")
 
 
 @app.get("/api/status")
 def status():
-    return {"voice": bool(env("SARVAM_API_KEY")), "cloud": bool(env("OPENROUTER_API_KEY")), "visionFallback": roboflow_ready(),
-            "cloudOcr": bool(env("GOOGLE_CLOUD_VISION_API_KEY"))}
+    detector = pocket_detector()
+    return {"voice": bool(env("SARVAM_API_KEY")), "cloud": bool(env("OPENROUTER_API_KEY")),
+            "visionFallback": detector != "none" and POCKET_DETECTORS[detector].problem() is None, "textReader": text_reader()}
 
 
 @app.get("/api/cloud/status")
@@ -253,23 +288,31 @@ def vision_lines(response: dict) -> dict:
     return {"width": page.get("width", 0), "height": page.get("height", 0), "lines": lines}
 
 
+async def read_with_google(images: list[str]) -> list[dict] | None:
+    """Text reader adapter: base64 JPEGs in, one page of lines per image out, or None."""
+    responses = await ask_vision(env("GOOGLE_CLOUD_VISION_API_KEY"), images)
+    if len(responses) != len(images) or any(r.get("error") for r in responses):
+        return None
+    return [vision_lines(r) for r in responses]
+
+
 @app.post("/api/ocr")
 async def read_text(request: OcrRequest):
-    key = env("GOOGLE_CLOUD_VISION_API_KEY")
-    if not key:
-        return {"error": "key_not_set"}
+    name = pick("TEXT_READER", TEXT_READERS, "device", "google" if env("GOOGLE_CLOUD_VISION_API_KEY") else "device")
+    if name == "device":
+        return {"error": "off"}  # the browser reads the label itself
+    if problem := TEXT_READERS[name].problem():
+        return {"error": problem}
     if any(len(image) > MAX_IMAGE_CHARS for image in request.images):
         return JSONResponse({"error": "too_large"}, status_code=413)
     if too_many_calls(ocr_calls, OCR_CALLS_PER_MINUTE):
         return {"error": "rate_limited"}
     try:
-        responses = await ask_vision(key, request.images)
+        pages = await TEXT_READERS[name].run(request.images)
     except Exception as error:  # the browser reads the label on the device instead
         log.warning("cloud text reading failed: %s", type(error).__name__)
         return {"error": "unavailable"}
-    if len(responses) != len(request.images) or any(r.get("error") for r in responses):
-        return {"error": "unavailable"}
-    return {"pages": [vision_lines(r) for r in responses]}
+    return {"pages": pages} if pages else {"error": "unavailable"}
 
 
 # ---------- strip detection fallback ----------
@@ -324,17 +367,23 @@ async def detect_strip(image: str) -> dict:
 
 @app.post("/api/vision/fallback")
 async def vision_fallback(request: ImageRequest):
-    if not env("ROBOFLOW_PRIVATE_API_KEY"):
-        return {"error": "key_not_set"}
-    if not env("ROBOFLOW_MODEL_ID"):
-        return {"error": "not_configured"}
+    name = pocket_detector()
+    if name == "none":
+        return {"error": "off"}
+    if problem := POCKET_DETECTORS[name].problem():
+        return {"error": problem}
     if too_many_calls():
         return {"error": "rate_limited"}
     try:
-        return await detect_strip(request.imageJpeg)
+        return await POCKET_DETECTORS[name].run(request.imageJpeg)
     except Exception as error:  # the app must keep running whatever the service does
         log.warning("strip detection failed: %s", type(error).__name__)
         return {"error": "unavailable"}
+
+
+# The engines each job can use. A new engine is one more adapter here, chosen with its setting.
+TEXT_READERS = {"google": Engine(lambda: None if env("GOOGLE_CLOUD_VISION_API_KEY") else "key_not_set", read_with_google)}
+POCKET_DETECTORS = {"roboflow": Engine(roboflow_problem, detect_strip)}
 
 
 # ---------- speech relay ----------

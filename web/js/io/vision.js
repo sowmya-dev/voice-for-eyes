@@ -3,7 +3,8 @@ import { extractFields, agree, emptyReading, labelIdOf } from '../core/label.js'
 import { postFallback, postOcr } from './api.js';
 
 const DETECTION = { textDetLimitSideLen: 736, textDetLimitType: 'max' };
-export function createVision(camera, { cloudOcr = () => false } = {}) {
+// textReader names the label text reader in use (TEXT_READER on the server): 'google' or 'device'.
+export function createVision(camera, { textReader = () => 'device' } = {}) {
   const worker = new Worker('/vendor/cleanup.worker.js');
   const pending = new Map();
   let nextId = 0;
@@ -66,11 +67,16 @@ export function createVision(camera, { cloudOcr = () => false } = {}) {
       return { reading: { ...emptyReading(), lines: [], frame: { width: 1, height: 1 } }, quality: { sharpness: 0, contrast: 0, brightness: 0, motion: 0 } };
     }
     const size = { width: frames[0].width, height: frames[0].height };
-    const colour = cloudOcr() ? frames.map((f) => ({ ...f, data: new Uint8ClampedArray(f.data) })) : null; // the worker takes the originals
+    const chosen = textReader();
+    const colour = chosen !== 'device' ? frames.map((f) => ({ ...f, data: new Uint8ClampedArray(f.data) })) : null; // the worker takes the originals
     const cleaned = await clean(frames);
-    // Cloud Vision reads the colour frames in any direction; the device reader is the fallback.
-    const cloud = colour && await readCloud(colour, cleaned.used, postOcr);
-    const { lines, reading } = cloud ?? await readOriented(cleaned.copies, async (copy, turn) => readCopy(await loadOcr(), copy, turn));
+    // Text readers, swappable: each gives { lines, reading } or null. Cloud Vision reads the colour frames in any
+    // direction; the device reader (PaddleOCR on the cleaned copies) is always the fallback.
+    const readers = {
+      google: () => readCloud(colour, cleaned.used, postOcr),
+      device: () => readOriented(cleaned.copies, async (copy, turn) => readCopy(await loadOcr(), copy, turn)),
+    };
+    const { lines, reading } = await readWith(readers, chosen);
     // Guidance uses the copy that found the most text.
     reading.lines = lines.reduce((a, b) => (b.length > a.length ? b : a));
     reading.frame = size;
@@ -88,6 +94,12 @@ export function createVision(camera, { cloudOcr = () => false } = {}) {
   }
 
   return { capture, countTablets, warmUp };
+}
+
+// The chosen reader first, then the device reader when it gives nothing or is not known here.
+export async function readWith(readers, chosen) {
+  const first = chosen !== 'device' && readers[chosen] ? await readers[chosen]() : null;
+  return first ?? readers.device();
 }
 
 // The two sharpest colour frames are read by Cloud Vision; a field counts only when both agree, as with the

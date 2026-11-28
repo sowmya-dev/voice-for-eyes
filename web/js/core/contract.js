@@ -14,7 +14,8 @@
  * @property {string|null} readable            what could be read while the label is unclear
  * @property {'left'|'right'|'up'|'down'|null} direction  the one move direction (screen 5)
  * @property {string|null} cue                 camera or strip cue id
- * @property {0|1|2|3} attempt                 retry attempt (screens 5, 5b, 5c)
+ * @property {number} attempt                  retry attempt (screens 5, 5b, 5c)
+ * @property {3|5} attempts                    attempts allowed: 5 once the name or expiry is read
  * @property {number|null} countdown           photo countdown (screen 5c)
  * @property {boolean} final                   no more attempts
  * @property {string|null} dial                emergency number to offer
@@ -31,7 +32,7 @@ export const SCREENS = ['1', '1b', 'reading', '2', '3', '4', '5', '5b', '5c', '5
 
 export const blankView = (lang = 'en') => ({
   screen: '1', lang, asked: null, spoken: '', tone: 'ok', tiles: null, risk: false, step: 0,
-  readable: null, direction: null, cue: null, attempt: 0, countdown: null, final: false, dial: null,
+  readable: null, direction: null, cue: null, attempt: 0, attempts: 3, countdown: null, final: false, dial: null,
 });
 
 const TILE_KEYS = ['count', 'expiry', 'expiryPrinted', 'name'];
@@ -46,7 +47,8 @@ export function checkView(view) {
   if (!['ok', 'warn', 'blur', 'emergency'].includes(view.tone)) problems.push('tone');
   if (view.tiles && Object.keys(view.tiles).sort().join() !== TILE_KEYS.join()) problems.push('tiles');
   if (view.direction && !['left', 'right', 'up', 'down'].includes(view.direction)) problems.push('direction');
-  if (view.attempt < 0 || view.attempt > 3) problems.push('attempt');
+  if (![3, 5].includes(view.attempts)) problems.push('attempts');
+  if (view.attempt < 0 || view.attempt > view.attempts) problems.push('attempt');
   if (typeof view.spoken !== 'string') problems.push('spoken');
   return problems;
 }

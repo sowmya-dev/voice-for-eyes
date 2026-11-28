@@ -5,29 +5,47 @@ import { cueFor } from '../js/core/guidance.js';
 
 const cutLeft = () => noExpiry({ lines: [{ text: 'Dolo 650', score: 0.9, box: { x: 2, y: 300, w: 600, h: 60 } }] });
 const FINAL = /can't confirm.*ask someone to check/;
+const READS_PER_BUDGET = 9; // a 17 s budget at 2 s per fake read
+const nothing = () => noExpiry({ name: null, lines: [{ text: '|l', score: 0.9, box: { x: 2, y: 300, w: 600, h: 60 } }] });
 
-test('blurry label: five seconds of cleaning, then the exact sentence with one direction', async () => {
+test('blurry label: five seconds of cleaning when nothing is read', async () => {
+  const t = setup({ readings: [nothing()] });
+  await t.hear('What is this tablet?');
+  assert.ok(t.said[0].at >= 5000 && t.said[0].at < 17000, `cleaned ${t.said[0].at} ms`);
+});
+
+test('partly read label: 17 seconds of reading, then the exact sentence with one direction', async () => {
   const t = setup({ readings: [cutLeft()] });
   await t.hear('What is this tablet?');
-  assert.ok(t.said[0].at >= 5000, `cleaned only ${t.said[0].at} ms`);
+  assert.ok(t.said[0].at >= 17000, `read only ${t.said[0].at} ms`);
   assert.match(t.said[0].text, /^I can read: Dolo 650\. I can't read this\. Move the medicine (left|right) so I can see the expiry date\./);
   const first = t.views.find((v) => v.screen === '5');
   assert.equal(first.attempt, 1);
   assert.equal(first.direction, 'right', 'a rear camera: cut at the left edge means move right');
 });
 
-test('three attempts, then ask someone to check', async () => {
-  const t = setup({ readings: [cutLeft()] });
+test('third retry fails: nothing read gets three attempts, then ask someone to check', async () => {
+  const t = setup({ readings: [nothing()] });
   await t.hear('What is this tablet?');
-  const attempts = [...new Set(t.views.filter((v) => v.attempt).map((v) => `${v.screen}:${v.attempt}`))];
-  assert.deepEqual(attempts, ['5:1', '5b:2', '5b:3']);
+  const attempts = [...new Set(t.views.filter((v) => v.attempt).map((v) => `${v.screen}:${v.attempt}/${v.attempts}`))];
+  assert.deepEqual(attempts, ['5:1/3', '5b:2/3', '5b:3/3']);
   assert.match(t.said.at(-1).text, FINAL);
   assert.equal(t.view().final, true);
-  assert.equal(t.said.filter((s) => /Move the medicine/.test(s.text)).length, 3);
+});
+
+test('partly read gets five tries, with what was read on the card', async () => {
+  const t = setup({ readings: [cutLeft()] });
+  await t.hear('What is this tablet?');
+  const attempts = [...new Set(t.views.filter((v) => v.attempt).map((v) => `${v.screen}:${v.attempt}/${v.attempts}`))];
+  assert.deepEqual(attempts, ['5:1/5', '5b:2/5', '5b:3/5', '5b:4/5', '5b:5/5']);
+  assert.equal(t.said.filter((s) => /Move the medicine/.test(s.text)).length, 5);
+  assert.match(t.said.at(-1).text, FINAL);
+  const asking = t.views.find((v) => v.screen === '5');
+  assert.equal(asking.tiles?.name, 'Dolo 650', 'the name stays on the card while the expiry is asked for');
 });
 
 test('readable on a retry: answer and stop asking', async () => {
-  const t = setup({ readings: [cutLeft(), cutLeft(), cutLeft(), reading()] });
+  const t = setup({ readings: [...Array(READS_PER_BUDGET)].map(cutLeft).concat(reading()) });
   await t.hear('What is this tablet?');
   assert.match(t.said.at(-1).text, /Dolo 650, a fever tablet/);
   assert.equal(t.said.filter((s) => /Move the medicine/.test(s.text)).length, 1);
@@ -35,10 +53,17 @@ test('readable on a retry: answer and stop asking', async () => {
 
 test('camera is fixed before the medicine is moved', async () => {
   const shaky = { reading: cutLeft(), quality: { ...GOOD_QUALITY, sharpness: 10, motion: 30 } };
-  const t = setup({ readings: [shaky, shaky, shaky, { reading: cutLeft(), quality: GOOD_QUALITY }] });
+  const t = setup({ readings: [...Array(READS_PER_BUDGET)].fill(shaky).concat({ reading: cutLeft(), quality: GOOD_QUALITY }) });
   await t.hear('What is this tablet?');
   assert.match(t.said[0].text, /hold the phone still/i);
   assert.match(t.said[1].text, /Move the medicine/);
+});
+
+test('moving but sharp: no request to hold still', () => {
+  const frame = { width: 1000, height: 1000 };
+  const cut = { frame, lines: [{ box: { x: 2, y: 300, w: 300, h: 100 } }], expiry: null };
+  assert.equal(cueFor(cut, { ...GOOD_QUALITY, motion: 30 }).action, 'right');
+  assert.equal(cueFor(cut, { ...GOOD_QUALITY, motion: 30, sharpness: 10 }).action, 'hold_still');
 });
 
 test('guidance: one cue at a time, sideways, then up or down, then distance', () => {

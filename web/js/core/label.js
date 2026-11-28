@@ -92,3 +92,16 @@ export function agree(copies) {
 }
 
 export const emptyReading = () => agree([]);
+
+// Adds a new read to what is already known about the same strip, keeping the first accepted value of
+// each field. A different name or expiry means a different strip (an expired strip may share the name),
+// so the new read starts again.
+export function mergeReading(known, read) {
+  const differs = (field) => read[field] && known[field] && keyOf[field](read[field]) !== keyOf[field](known[field]);
+  if (!known || differs('name') || differs('expiry')) return read;
+  const merged = { ...read };
+  for (const field of Object.keys(keyOf)) merged[field] = known[field] ?? read[field];
+  for (const field of ['warnings', 'nutrition']) merged[field] = read[field]?.length ? read[field] : (known[field] ?? []);
+  merged.labelId = labelIdOf(merged.name, merged.expiry);
+  return merged;
+}

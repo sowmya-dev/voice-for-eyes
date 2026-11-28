@@ -8,10 +8,13 @@ import { evaluate, isMedicalAdvice } from './safety.js';
 import { classify, monthsLeft, lastValidDay } from './expiry.js';
 import { purposeFor } from './ingredients.js';
 import { cueFor, isHazy } from './guidance.js';
-import { normalise, emptyReading } from './label.js';
+import { normalise, emptyReading, mergeReading } from './label.js';
 import { blankView } from './contract.js';
 
 const CLEAN_MS = 5000; // spend this long cleaning frames before asking the user to move anything
+const CLEAN_KNOWN_MS = 17000; // longer once the name or expiry is read: the strip is clearly in view (D14)
+const MAX_ATTEMPTS_KNOWN = 5; // more requests once the name or expiry is read (D15)
+const LABEL_KEEP_MS = 5 * 60 * 1000; // follow-up questions are answered from the remembered label this long
 const MOVE_WAIT_MS = 3000; // time to move the medicine before the next read
 const RISK_WAIT_MS = 8000; // silence after the risk question
 const MAX_ATTEMPTS = 3;
@@ -23,6 +26,8 @@ const OWN_CAMERA = ['2', '5', '5b', '5c']; // these already show the camera and 
 
 const seg = (id, slots = {}) => ({ id, slots });
 const complete = (label, today) => Boolean(label.name && label.expiry) || classify(label.expiry, today) === 'expired';
+const partlyRead = (label) => Boolean(label.name || label.expiry);
+const attemptsFor = (label) => (partlyRead(label) ? MAX_ATTEMPTS_KNOWN : MAX_ATTEMPTS);
 const memorable = (intent) => intent.name === 'dose' || (intent.name === 'identify' && ['all', 'expiry'].includes(intent.aspect));
 
 // A spoken brand with its strength, for example "dolo 500", that does not match the label. A year is not a strength.
@@ -61,13 +66,29 @@ function expirySegment(label, today) {
   return seg('expiry.date', { ...label.expiry });
 }
 
+// Asked about the expiry: the printed date, then one plain sentence about what it means.
+function expiryAnswer(label, today) {
+  if (!label.expiry) return [seg('unreadable.expiry')];
+  const date = seg('expiry.date', { ...label.expiry });
+  const window = classify(label.expiry, today);
+  if (window === 'expired') return [date, seg('expiry.new_one')]; // the safety rules put the warning first
+  const last = lastValidDay(label.expiry);
+  const days = Math.round((Date.UTC(last.year, last.month - 1, last.day) - Date.UTC(today.year, today.month - 1, today.day)) / 864e5);
+  if (days === 0) return [date, seg('expiry.today')];
+  if (window === 'week' || window === 'month') return [date, days === 1 ? seg('expiry.day_left') : seg('expiry.days_left', { n: days })];
+  const months = monthsLeft(label.expiry, today);
+  if (months < 12) return [date, months <= 1 ? seg('expiry.good_month') : seg('expiry.good_months', { n: months })];
+  const years = Math.floor(months / 12);
+  return [date, years === 1 ? seg('expiry.good_year') : seg('expiry.good_years', { n: years })];
+}
+
 function composeMedicine(intent, label, today) {
   const plan = { intent: intent.name, aspect: intent.aspect, medicine: true, segments: [] };
   const name = label.name ? seg('id.name', { name: label.name }) : seg('unreadable.name');
   if (intent.name === 'dose') {
     plan.segments = [label.dosage ? seg('dose.printed', { text: label.dosage }) : seg('dose.none')];
   } else if (intent.aspect === 'expiry') {
-    plan.segments = [name, label.expiry ? seg('expiry.date', { ...label.expiry }) : seg('unreadable.expiry')];
+    plan.segments = expiryAnswer(label, today);
   } else {
     const purposeKey = label.name ? purposeFor(label.ingredient) : null;
     plan.segments = [
@@ -98,6 +119,7 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
     again: null, // runs the current question again, if it is paused while the label is being read
     paused: null,
     lastLabel: null, sceneHistory: [], memory: [], cancelTimer: null,
+    label: null, // { reading, at, count }: everything read from the strip in front of the camera, gathered across reads
   };
   const stale = (turn) => turn !== state.turn;
   const today = () => ports.today();
@@ -126,19 +148,28 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
     const started = ports.now();
     try {
       const result = await ports.capture();
-      if (result.reading.labelId) state.lastLabel = result.reading;
+      // Every read adds to what is known about the strip, so a name from the front and an expiry from the back add up.
+      const known = remembered();
+      const reading = mergeReading(known?.reading, result.reading);
+      if (known && reading !== result.reading) Object.assign(known, { reading, at: ports.now() });
+      else state.label = { reading, at: ports.now(), count: undefined, counting: null };
+      if (reading.labelId) state.lastLabel = reading;
       ports.log({ stage: 'label', durationMs: ports.now() - started, outcome: 'ok', turnId: state.turn });
-      return result;
+      return { ...result, reading };
     } catch (error) {
       ports.log({ stage: 'label', durationMs: ports.now() - started, outcome: 'error', code: error.name, turnId: state.turn });
       return { reading: { ...emptyReading(), lines: [], frame: { width: 1, height: 1 } }, quality: { sharpness: 0, contrast: 0, brightness: 0, motion: 0 } };
     }
   }
 
+  // The remembered label, while it is fresh.
+  const remembered = () => (state.label && ports.now() - state.label.at < LABEL_KEEP_MS ? state.label : null);
+
   async function readWithBudget(turn) {
     const started = ports.now();
     let result = await capture();
-    while (!complete(result.reading, today()) && ports.now() - started < CLEAN_MS && !stale(turn)) result = await capture();
+    const budget = () => (partlyRead(result.reading) ? CLEAN_KNOWN_MS : CLEAN_MS);
+    while (!complete(result.reading, today()) && ports.now() - started < budget() && !stale(turn)) result = await capture();
     return result;
   }
 
@@ -203,10 +234,27 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
       state.memory.push({ labelId: label.labelId, key, plan: draft });
       if (state.memory.length > MEMORY_SIZE) state.memory.shift();
     }
+    countInBackground();
     return deliver(draft, label, turn, ctx);
   }
 
+  // Once the label is complete, the tablets are counted once without making the user wait.
+  function countInBackground() {
+    const entry = remembered();
+    if (!ports.countTablets || !entry || entry.count !== undefined || entry.counting) return;
+    entry.counting = ports.countTablets()
+      .then((result) => { if (result?.count != null) entry.count = result.count; })
+      .catch(() => {})
+      .finally(() => { entry.counting = null; });
+  }
+
   async function medicine(intent, turn, ctx) {
+    // "What is this tablet?" is about the tablet in front of the camera now, so it is read again.
+    if (intent.name === 'identify' && intent.aspect === 'all') state.label = null;
+    const known = remembered();
+    if (known && complete(known.reading, today()) && !namesAnotherMedicine(ctx.text, known.reading)) {
+      return finishMedicine(intent, known.reading, turn, ctx);
+    }
     look(ctx.asked);
     const first = await readWithBudget(turn);
     if (stale(turn)) return;
@@ -231,7 +279,8 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
 
   async function giveUp(task, turn) {
     state.task = null;
-    await prompt([seg('retry.final')], { screen: '5b', tone: 'blur', asked: task.ctx.asked, attempt: MAX_ATTEMPTS, final: true });
+    const attempts = task.attempts ?? MAX_ATTEMPTS;
+    await prompt([seg('retry.final')], { screen: '5b', tone: 'blur', asked: task.ctx.asked, attempt: attempts, attempts, final: true });
   }
 
   // At most three attempts. Camera problems are fixed first and do not use up an attempt.
@@ -248,16 +297,19 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
       const cue = cueFor(read.reading, read.quality, { frontCamera: read.frontCamera, previousHazy: task.hazy });
       task.hazy = isHazy(read.quality);
       const isCamera = cue.phase === 'camera';
+      // Whatever has been read stays on the card while the rest is asked for.
+      const tiles = partlyRead(read.reading) ? tilesFor(read.reading, today(), state.lang) : null;
+      const attempts = (task.attempts = attemptsFor(read.reading));
       if (isCamera && task.cameraCues < MAX_CAMERA_CUES) {
         task.cameraCues += 1;
-        task.last = { segments: [seg(`cue.${cue.action}`)], patch: { screen: task.attempt > 1 ? '5b' : '5', tone: 'blur', asked: task.ctx.asked, cue: cue.action, attempt: task.attempt } };
+        task.last = { segments: [seg(`cue.${cue.action}`)], patch: { screen: task.attempt > 1 ? '5b' : '5', tone: 'blur', asked: task.ctx.asked, cue: cue.action, attempt: task.attempt, attempts, tiles } };
       } else {
-        if (isCamera || task.attempt >= MAX_ATTEMPTS) return giveUp(task, turn);
+        if (isCamera || task.attempt >= attempts) return giveUp(task, turn);
         task.attempt += 1;
         const { segments, readable } = instruction(cue, read.reading);
         task.last = {
           segments,
-          patch: { screen: task.attempt === 1 ? '5' : '5b', tone: 'blur', asked: task.ctx.asked, readable, cue: cue.action, attempt: task.attempt, direction: DIRECTIONS.includes(cue.action) ? cue.action : null },
+          patch: { screen: task.attempt === 1 ? '5' : '5b', tone: 'blur', asked: task.ctx.asked, readable, cue: cue.action, attempt: task.attempt, direction: DIRECTIONS.includes(cue.action) ? cue.action : null, attempts, tiles },
         };
       }
       await prompt(task.last.segments, task.last.patch);
@@ -268,8 +320,9 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
 
   async function takePhoto(turn) {
     const task = state.task;
-    if (task.attempt < MAX_ATTEMPTS) task.attempt += 1;
-    const patch = { screen: '5c', tone: 'blur', asked: task.ctx.asked, attempt: task.attempt };
+    const attempts = task.attempts ?? MAX_ATTEMPTS;
+    if (task.attempt < attempts) task.attempt += 1;
+    const patch = { screen: '5c', tone: 'blur', asked: task.ctx.asked, attempt: task.attempt, attempts };
     show({ ...patch, countdown: 3, spoken: renderSegments([seg('photo.countdown')], state.lang) });
     const speaking = speak([seg('photo.countdown')]);
     for (const n of [3, 2, 1]) {
@@ -280,7 +333,7 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
     await speaking;
     const result = await capture();
     if (stale(turn)) return;
-    if (!complete(result.reading, today()) && task.attempt >= MAX_ATTEMPTS) return giveUp(task, turn);
+    if (!complete(result.reading, today()) && task.attempt >= attemptsFor(result.reading)) return giveUp(task, turn);
     return retry(task, turn, result);
   }
 
@@ -298,6 +351,14 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
   const countOnce = async () => (ports.countTablets ? (await ports.countTablets())?.count ?? null : null);
 
   async function count(turn, ctx) {
+    const known = remembered();
+    if (known?.counting) await known.counting;
+    if (stale(turn)) return;
+    if (known && typeof known.count === 'number' && complete(known.reading, today())) {
+      const n = known.count;
+      const segment = n === 1 ? seg('count.visible_one') : seg('count.visible', { n });
+      return deliver({ intent: 'identify', aspect: 'count', medicine: true, segments: [segment] }, known.reading, turn, { ...ctx, count: n });
+    }
     look(ctx.asked);
     const { reading: label } = await capture();
     if (stale(turn)) return;
@@ -311,6 +372,7 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
       seen = await countOnce();
     }
     if (stale(turn)) return;
+    if (seen !== null && state.label) state.label.count = seen;
     const segment = seen === null ? seg('count.give_up') : seen === 1 ? seg('count.visible_one') : seg('count.visible', { n: seen });
     await deliver({ intent: 'identify', aspect: 'count', medicine: true, segments: [segment] }, label, turn, { ...ctx, count: seen });
   }
@@ -348,6 +410,7 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
     if (intent.aspect === 'unwell') return urgent('unwell', [seg('help.unwell')], turn, ctx);
     const plan = (segments, medicineAnswer = true) => ({ intent: 'safety', aspect: intent.aspect, medicine: medicineAnswer, segments });
     if (intent.aspect === 'which_take') return deliver(plan([seg('rec.none')], false), null, turn, ctx);
+    if (['took', 'took_more'].includes(intent.aspect) && state.label) state.label.count = undefined; // the strip has changed
     look(ctx.asked);
     const { reading: label } = await capture();
     if (stale(turn)) return;
@@ -444,7 +507,7 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
 
   async function command(name, turn) {
     if (name === 'start_over') {
-      Object.assign(state, { risk: null, unclear: 0, offer: null, task: null, paused: null, history: [] });
+      Object.assign(state, { risk: null, unclear: 0, offer: null, task: null, paused: null, history: [], label: null });
       return show({ screen: '1' }, { remember: false });
     }
     if (name === 'back') {

@@ -56,6 +56,12 @@ test('Sideways strip: a quarter turn either way is found', async () => {
   }
 });
 
+test('Upright strip: a name read upright means no turned copy, even without the expiry', async () => {
+  const calls = [];
+  await readOriented(copies, async (copy, turn) => { calls.push(turn); return [LABEL[0]]; });
+  assert.ok(calls.every((turn) => turn === 0), JSON.stringify(calls));
+});
+
 test('Nothing readable at any turn keeps the upright reading', async () => {
   const ocr = ocrAt(-1);
   const { reading } = await readOriented(copies, ocr.read);

@@ -14,7 +14,8 @@ function union(boxes) {
 export const isHazy = (quality) => quality.sharpness < LIMITS.sharpness && quality.contrast < LIMITS.haze;
 
 export function cueFor(reading, quality, { frontCamera = false, previousHazy = false } = {}) {
-  if (quality.motion > LIMITS.motion) return camera('hold_still', 'blurry');
+  // Movement matters only when it blurred every frame: cleaning keeps and aligns the sharpest ones.
+  if (quality.motion > LIMITS.motion && quality.sharpness < LIMITS.sharpness) return camera('hold_still', 'blurry');
   if (isHazy(quality)) return previousHazy ? camera('wipe_lens', 'hazy') : camera('hold_still', 'blurry');
   if (quality.brightness < LIMITS.dark || !reading.lines.length) return camera('point_camera', 'not_aimed');
 

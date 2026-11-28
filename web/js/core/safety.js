@@ -4,7 +4,9 @@ import { classify } from './expiry.js';
 
 const seg = (id, slots = {}) => ({ id, slots });
 const DOSAGE = new Set(['dose.printed']);
-const DROP_WHEN_EXPIRED = new Set(['dose.printed', 'dose.none', 'dose.withheld', 'id.confirm_doctor', 'expiry.in', 'expiry.in_one', 'took.ack']);
+const DAYS_LEFT = ['expiry.days_left', 'expiry.day_left', 'expiry.today'];
+const DROP_WHEN_EXPIRED = new Set(['dose.printed', 'dose.none', 'dose.withheld', 'id.confirm_doctor', 'expiry.in', 'expiry.in_one', 'took.ack',
+  ...DAYS_LEFT, 'expiry.good_month', 'expiry.good_months', 'expiry.good_year', 'expiry.good_years']);
 const FIRST = new Set(['safety.emergency', 'dial.trying', 'dial.manual', 'help.unwell']);
 
 export function evaluate(plan, label, today) {
@@ -42,7 +44,8 @@ export function evaluate(plan, label, today) {
   } else if (window === 'week' || window === 'month') {
     // The notice comes before other medicine details, but never before help instructions.
     const at = segments.reduce((i, s, n) => (FIRST.has(s.id) ? n + 1 : i), 0);
-    segments.splice(at, 0, seg(`notice.${window}`));
+    // An expiry answer that says the days left already gives the notice.
+    if (!segments.some((s) => DAYS_LEFT.includes(s.id))) segments.splice(at, 0, seg(`notice.${window}`));
     drop((s) => s.id === 'expiry.in' || s.id === 'expiry.in_one');
   }
 

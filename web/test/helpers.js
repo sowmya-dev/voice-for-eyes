@@ -72,6 +72,7 @@ export function setup({ readings = [reading()], counts = null, cloud = null, clo
     assistant, said, views, dialled, cloudCalls, speechLanguages, screensAtRead,
     duringNextRead: (act) => { reading_ = act; },
     captures: () => captures,
+    advance: (ms) => { clock += ms; },
     duringNextWait: (act) => { waiting = act; },
     keepLoading: (pattern) => { loading = pattern; },
     view: () => views.at(-1),

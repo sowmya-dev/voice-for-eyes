@@ -24,7 +24,7 @@ The system SHALL replay the previous answer when a question is repeated about th
 - **THEN** a new answer is produced from the new label
 
 ### Requirement: Label gathered across reads
-While the user is asking about one strip, the system SHALL combine what each read accepts (name, expiry, ingredient, printed dosage, printed pack count) into one remembered label, keeping the first accepted value of each field, and SHALL treat the label as complete once the combined label has the name and the expiry. If a read accepts a different name from the remembered one, the system SHALL drop the remembered label and start again from that read.
+While the user is asking about one strip, the system SHALL combine what each read accepts (name, expiry, ingredient, printed dosage, printed pack count) into one remembered label, keeping the first accepted value of each field, and SHALL treat the label as complete once the combined label has the name and the expiry. If a read accepts a different name or a different expiry from the remembered one, the system SHALL treat it as a different strip, drop the remembered label and start again from that read.
 
 #### Scenario: Name then expiry
 - **WHEN** one read gives only the name and a later read, after the strip is turned, gives only the expiry
@@ -33,6 +33,10 @@ While the user is asking about one strip, the system SHALL combine what each rea
 #### Scenario: Different strip
 - **WHEN** a later read gives a different medicine name
 - **THEN** the earlier fields are dropped and only the new read is used
+
+#### Scenario: Same name, different expiry
+- **WHEN** a later read gives the same name but a different expiry, such as an expired strip of the same medicine
+- **THEN** the earlier fields are dropped and the new expiry, with its warning, is used
 
 ### Requirement: Answer from the remembered label
 After a label is complete, the system SHALL answer medicine questions (expiry, dosage, purpose) from the remembered label without reading the camera, for 5 minutes after the label was last read. The system SHALL read the camera again when the user asks to identify a medicine ("What is this tablet?"), names a different medicine, or says "start over", or when 5 minutes have passed.

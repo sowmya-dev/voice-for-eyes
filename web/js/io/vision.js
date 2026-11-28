@@ -96,14 +96,15 @@ export async function countFrames(frames, used, post) {
   return counts[0] !== null && counts[0] === counts[1] ? counts[0] : null;
 }
 
-// Reads every copy upright. Only when the name or expiry is missing, the enhanced copy is read at each
-// quarter turn, and every copy is read again at the turn that found the most confident text.
+// Reads every copy upright. Only when neither the name nor the expiry is found, the averaged copy is read
+// at each quarter turn, and every copy is read again at the turn that found the most confident text.
+// If either was found, the strip is the right way up and the rest is usually on its other side.
 export async function readOriented(copies, read) {
   const upright = [];
   for (const copy of copies) upright.push(await read(copy, 0));
   const reading = agree(upright.map(extractFields));
-  if (reading.name && reading.expiry) return { lines: upright, reading };
-  const probe = copies.find((c) => c.kind === 'enhanced') ?? copies[0];
+  if (reading.name || reading.expiry) return { lines: upright, reading };
+  const probe = copies.find((c) => c.kind === 'averaged') ?? copies[0];
   const tried = new Map([[0, upright[copies.indexOf(probe)]]]);
   for (const turn of [1, 2, 3]) tried.set(turn, await read(probe, turn));
   const best = [...tried.keys()].reduce((a, b) => (textWeight(tried.get(b)) > textWeight(tried.get(a)) ? b : a));

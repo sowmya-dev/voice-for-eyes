@@ -26,7 +26,7 @@ All decisions are **Proposed**. None is agreed until we brainstorm this change.
 ### 4. One remembered label, gathered across reads
 - **Status:** Agreed (user, 2026-11-28: "gather as much contents as it can from the strip ... save the contents in memory and answer back")
 - **Plain English:** Every read adds what it found to one remembered label, so the name from the front and the expiry from the back add up. Follow-up questions are answered from it straight away. The camera is used again for a new tablet, after "start over", or after 5 minutes. A different name means a different strip, so the remembered label is dropped.
-- **Pseudo-technical:** `label = merge(label, read) if same name or no name else read; complete(label) = name && expiry; ask(q): if label.complete && now - label.at < 5 min && q.aspect != 'all': answer(label) else read camera`
+- **Pseudo-technical:** `label = read if read.name or read.expiry differs from label's else merge(label, read); complete(label) = name && expiry; ask(q): if label.complete && now - label.at < 5 min && q.aspect != 'all': answer(label) else read camera`
 
 ### 5. Count in the background
 - **Status:** Agreed (user, 2026-11-28)

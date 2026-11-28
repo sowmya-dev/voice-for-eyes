@@ -137,15 +137,15 @@ export function createRenderer({ onAction }) {
       h('h1', {}, view.final ? t.checkTitle : t.anotherSideTitle),
       card(said(view)),
       card(
-        h('div', { class: 'dots', 'aria-hidden': 'true' }, [1, 2, 3].map((n) => h('span', { class: n <= view.attempt ? 'filled' : '' }))),
-        view.final ? null : h('div', { class: 'small' }, fill(t.attemptOf, { n: view.attempt }))),
+        h('div', { class: 'dots', 'aria-hidden': 'true' }, Array.from({ length: view.attempts }, (_, i) => h('span', { class: i < view.attempt ? 'filled' : '' }))),
+        view.final ? null : h('div', { class: 'small' }, fill(t.attemptOf, { n: view.attempt, max: view.attempts }))),
       retryButtons(view, t),
     ],
     '5c': (view, ui, t) => [
       h('h1', {}, t.holdStillTitle),
       card(said(view), h('div', { class: 'lead' }, t.photoHint)),
-      h('div', { class: 'dots', 'aria-hidden': 'true' }, [1, 2, 3].map((n) => h('span', { class: n <= view.attempt ? 'filled' : '' }))),
-      h('div', { class: 'small' }, fill(t.attemptOf, { n: view.attempt })),
+      h('div', { class: 'dots', 'aria-hidden': 'true' }, Array.from({ length: view.attempts }, (_, i) => h('span', { class: i < view.attempt ? 'filled' : '' }))),
+      h('div', { class: 'small' }, fill(t.attemptOf, { n: view.attempt, max: view.attempts })),
     ],
   };
 

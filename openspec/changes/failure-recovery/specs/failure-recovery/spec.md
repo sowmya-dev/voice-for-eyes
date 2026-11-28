@@ -69,18 +69,22 @@ If the name or expiry is still unreadable after cleaning, the system SHALL keep 
 - **THEN** "up/down/left/right" is replaced by the single direction, as the user sees it while holding the medicine, that will bring the unreadable text into better view
 
 ### Requirement: Retry limit for an unreadable label
-The system SHALL make at most 3 attempts for the same unreadable label, or at most 5 once at least one field of the label has been read, where each request to move, flip or turn the medicine, or to take a photo, counts as one attempt, cleaning the image again after each. If it is still unreadable after the last attempt, the system SHALL stop asking, say that it cannot confirm the unreadable information, and suggest that someone check the label before the medicine is taken.
+The system SHALL make at most 3 requests for the same question, where every request counts as one, whether it is to fix the camera (hold still, wipe the lens, point the camera), to move, flip or turn the medicine, or to take a photo, cleaning the image again after each. If it is still unreadable after the third request, the system SHALL stop asking, say that it cannot confirm the unreadable information, suggest that someone check the label before the medicine is taken, and return to the landing screen. What was read stays in session memory.
 
 #### Scenario: Readable on a retry
 - **WHEN** the information becomes readable after any of the 3 moves
 - **THEN** the system answers from it and asks for no more moves
 
-#### Scenario: Partly read gets five tries
-- **WHEN** the name was read but the expiry is still unreadable after the third move
-- **THEN** the system asks for up to two more moves before it stops
+#### Scenario: Camera requests count too
+- **WHEN** the user is asked to hold still twice and then to move the medicine once
+- **THEN** that is 3 requests, and no further request is made
+
+#### Scenario: Back to the landing screen
+- **WHEN** the third request has not helped
+- **THEN** the final message is spoken and the landing screen is shown, with the session memory kept
 
 #### Scenario: Third retry fails
-- **WHEN** nothing on the label was read and it is still unreadable after the third move
+- **WHEN** the label is still unreadable after the third request, whether or not part of it was read
 - **THEN** the system stops asking, says it cannot confirm it, and suggests that someone check the label before the medicine is taken
 
 ### Requirement: Nothing from unclear text
@@ -102,7 +106,7 @@ When the system can tell that the part of a strip with the expiry has been cut o
 - **THEN** the unreadable-label steps apply
 
 ### Requirement: Whole strip for a count
-When the user asks how many tablets are in a strip and no count can be accepted, the system SHALL ask once, either to show the entire strip or, when used pockets are seen but the printed total is not known, to show the side with the pack size. If the count is still not reliable after that one request, the system SHALL stop asking, say what it could see (such as the number of used pockets), say that it cannot tell how many are left, and ask the user to have someone count them.
+When the user asks how many tablets are in a strip and no count can be accepted, the system SHALL ask once, either to show the entire strip or, when used pockets are seen but the printed total is not known, to show the side with the pack size. If the count is still not reliable after that one request, the system SHALL stop asking, say what it could see (such as the number of used pockets), say that it cannot tell how many are left, ask the user to have someone count them, and return to the landing screen.
 
 #### Scenario: Strip not fully visible
 - **WHEN** part of the strip is hidden or unclear and no count can be accepted
@@ -114,7 +118,7 @@ When the user asks how many tablets are in a strip and no count can be accepted,
 
 #### Scenario: One request, then an honest answer
 - **WHEN** the count is still not reliable after the one request
-- **THEN** the system asks no more, says it cannot count the tablets and asks the user to have someone count them
+- **THEN** the system asks no more, says it cannot count the tablets, asks the user to have someone count them and returns to the landing screen
 
 #### Scenario: Used pockets seen, nothing left to work out
 - **WHEN** 3 used pockets are seen but the pack size is still unread after the one request

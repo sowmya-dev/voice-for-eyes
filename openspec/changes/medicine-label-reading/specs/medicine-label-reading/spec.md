@@ -174,3 +174,26 @@ The system SHALL keep every line of text that two copies agree on, with its lett
 #### Scenario: Expired label read out
 - **WHEN** the label has expired and the user asks what is written
 - **THEN** the reply begins with the expired warning
+
+### Requirement: Composition and description
+The system SHALL read, agree across copies and remember with the label: the composition (the lines after "Composition" or "Each tablet contains", with their strengths), the generic or chemical name line (such as "Paracetamol Tablets IP 650 mg") and the maker. When the user asks what the medicine contains, what it is made of, or its chemical or generic name, the system SHALL answer from the printed composition, else the printed generic name, else the ingredient found on the label, and otherwise say it cannot read it. When the user asks to be told about the medicine, the system SHALL describe it in a few plain sentences: what it is and what it is for, its generic name, what it contains, who makes it, the expiry and the pack size, each only when read. These answers SHALL come from the remembered label when it is there, and SHALL follow the expired-warning rules.
+
+#### Scenario: Composition printed
+- **WHEN** the label says "Composition: Each tablet contains Paracetamol IP 650 mg" and the user asks "What does it contain?"
+- **THEN** the system says it contains Paracetamol IP 650 mg
+
+#### Scenario: Chemical name
+- **WHEN** the label prints "Paracetamol Tablets IP 650 mg" and no composition, and the user asks for the chemical name
+- **THEN** the system says the generic name is Paracetamol Tablets IP 650 mg
+
+#### Scenario: Composition not readable
+- **WHEN** neither a composition, a generic name nor an ingredient was read
+- **THEN** the system says it cannot read what the medicine contains
+
+#### Scenario: Tell me about it
+- **WHEN** the user says "Tell me about this medicine"
+- **THEN** the reply describes what it is, its generic name, what it contains, its maker, its expiry and its pack size, from memory
+
+#### Scenario: Expired description
+- **WHEN** the label has expired and the user asks for a description
+- **THEN** the reply begins with the expired warning

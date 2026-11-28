@@ -43,6 +43,11 @@ All decisions are **Proposed**. None is agreed until we brainstorm this change.
 - **Plain English:** The strip model in use sees used pockets only, so asking again and again rarely helps. The app asks once (for the whole strip, or for the side with the pack size), then says honestly what it saw and that it cannot tell how many are left. Checked the same day: Google Cloud Vision's object detection is no substitute: on a whole strip of 10 tablets it found 4 "Coin", and nothing on the others.
 - **Pseudo-technical:** `count: result = countOnce(); if !counted: ask once (show_print if empty && !packCount else show_strip); retry once; if still !counted: empty ? count.used_only(empty) : count.give_up`
 
+### 8. Three requests in all, then the landing screen
+- **Status:** Agreed (user, 2026-11-28: "stop asking again and again ... have 3 retries and take to landing page")
+- **Plain English:** Camera fixes used to come on top of 3 (later 5) move requests, so one question could bring 8 requests. Now every request counts, at most 3, and then the app says the final message and goes back to the landing screen. What was read stays remembered.
+- **Pseudo-technical:** `retry: if task.attempt >= 3: giveUp -> say retry.final, show screen 1; task.attempt += 1 for camera and strip cues alike`
+
 ## High-level architecture flow
 ```text
 doubtful speech -> cross-check with camera text -> repeat or move somewhere quieter -> read label + confirm likely request -> repeat the question

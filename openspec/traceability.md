@@ -110,7 +110,7 @@ Decision on 2026-11-27: submit a web app and build Android later (D1-D6). D7-D16
 | D12 | Android TextToSpeech with Google voices (web: best available browser voice, D5) | Decided 2026-11-28: replies are spoken by Sarvam through the app server, so reply text goes to Sarvam. Fallback is an on-device voice; an online browser voice only with cloud help on |
 | D13 | Detect language per utterance; switch only when confident | Decided 2026-11-28: after the user names a language, speech recognition is set to it and automatic switching pauses until another is named |
 | D14 | Spend five seconds cleaning the image | Five seconds, or 17 seconds once the name or expiry has been read (user, 2026-11-28) |
-| D15 | At most three retries | Three, or five once the name or expiry has been read (user, 2026-11-28) |
+| D15 | At most three retries | Three requests of any kind, camera fixes included, then back to the landing screen (user, 2026-11-28; an earlier five-try rule was dropped) |
 | D16 | On-device OCR with PaddleOCR | Google Cloud Vision from the app server when its key is set; PaddleOCR on the device otherwise (user, 2026-11-28) |
 
 On-device voice detection and language identification are unchanged; speech-to-text follows D9. Whether the on-device models run in a browser is unverified until the spike described in the platform-and-privacy design.

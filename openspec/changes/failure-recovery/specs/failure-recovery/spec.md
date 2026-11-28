@@ -102,19 +102,23 @@ When the system can tell that the part of a strip with the expiry has been cut o
 - **THEN** the unreadable-label steps apply
 
 ### Requirement: Whole strip for a count
-When the user asks how many tablets are in a strip and no count can be accepted, the system SHALL ask the user to show the entire strip, at most 3 times. If the count is still not reliable after that, the system SHALL stop asking, say that it cannot count the tablets, and ask the user to have someone count them.
+When the user asks how many tablets are in a strip and no count can be accepted, the system SHALL ask once, either to show the entire strip or, when used pockets are seen but the printed total is not known, to show the side with the pack size. If the count is still not reliable after that one request, the system SHALL stop asking, say what it could see (such as the number of used pockets), say that it cannot tell how many are left, and ask the user to have someone count them.
 
 #### Scenario: Strip not fully visible
 - **WHEN** part of the strip is hidden or unclear and no count can be accepted
 - **THEN** the system asks the user to show the entire strip and states no number
 
 #### Scenario: Counted on a retry
-- **WHEN** the count becomes reliable after any of the 3 requests
+- **WHEN** the count becomes reliable after the request
 - **THEN** the system states it and asks no more
 
-#### Scenario: Third count retry fails
-- **WHEN** the count is still not reliable after the third request
-- **THEN** the system says it cannot count the tablets and asks the user to have someone count them
+#### Scenario: One request, then an honest answer
+- **WHEN** the count is still not reliable after the one request
+- **THEN** the system asks no more, says it cannot count the tablets and asks the user to have someone count them
+
+#### Scenario: Used pockets seen, nothing left to work out
+- **WHEN** 3 used pockets are seen but the pack size is still unread after the one request
+- **THEN** the system says it can see 3 used, cannot tell how many are left, and asks the user to have someone count them
 
 ### Requirement: Camera check first
 Before asking the user to move the medicine, the system SHALL check the camera. If pictures are blurry from movement, stay hazy after cleaning and a retry, or the camera is not pointed at the medicine, it SHALL tell the user how to fix the camera first. Only once the camera is fixed SHALL it ask the user to move the medicine.

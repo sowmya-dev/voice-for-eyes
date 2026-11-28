@@ -38,6 +38,11 @@ All decisions are **Proposed**. None is agreed until we brainstorm this change.
 - **Plain English:** Once the name or the expiry has been read, the strip is clearly in front of the camera, so the app keeps reading for longer before asking, allows five requests instead of three, and shows what it has read on the card while it asks for the rest.
 - **Pseudo-technical:** `known = label.name || label.expiry; budget = known ? 17s : 5s; maxAttempts = known ? 5 : 3; retry screens carry tiles = tilesFor(gathered label)`
 
+### 7. One request for a count
+- **Status:** Agreed (user, 2026-11-28: "it still keeps asking to show entire strip")
+- **Plain English:** The strip model in use sees used pockets only, so asking again and again rarely helps. The app asks once (for the whole strip, or for the side with the pack size), then says honestly what it saw and that it cannot tell how many are left. Checked the same day: Google Cloud Vision's object detection is no substitute: on a whole strip of 10 tablets it found 4 "Coin", and nothing on the others.
+- **Pseudo-technical:** `count: result = countOnce(); if !counted: ask once (show_print if empty && !packCount else show_strip); retry once; if still !counted: empty ? count.used_only(empty) : count.give_up`
+
 ## High-level architecture flow
 ```text
 doubtful speech -> cross-check with camera text -> repeat or move somewhere quieter -> read label + confirm likely request -> repeat the question

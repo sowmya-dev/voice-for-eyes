@@ -28,6 +28,11 @@ All decisions are **Proposed** until reviewed. The user asked for the 7-day and 
 - **Plain English:** Two prepared sentences, translated and reviewed for each language: "This medicine expires within 7 days." and "This medicine expires within one month."
 - **Pseudo-technical:** `templateId in {expiry.week, expiry.month}`
 
+### 5. The expiry answer says the date, then what it means
+- **Status:** Agreed (user, 2026-11-28)
+- **Plain English:** Asked about the expiry, the app says the printed date and then one plain sentence: expired and get a new one, days left and fine to take, or how many months or years it is still good for. The expired warning still comes first, as the safety rules require.
+- **Pseudo-technical:** `days = lastValidDay(expiry) - today; expired -> [warn.expired, expiry.date, expiry.new_one]; days == 0 -> expiry.today; window in {week, month} -> expiry.days_left(days); months < 12 -> expiry.good_months(months); else expiry.good_years(floor(months / 12))`
+
 ## High-level architecture flow
 ```text
 label -> accepted EXP date -> parseExpiry -> classify(expiry, today)

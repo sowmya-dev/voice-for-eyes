@@ -45,7 +45,7 @@ The system SHALL read medicine names and expiry from blurred, glared and embosse
 - **THEN** each accepted name and expiry matches the printed text, and anything unaccepted is reported unreadable
 
 ### Requirement: Turned label
-When the upright reading does not give both the medicine name and the expiry, the system SHALL also read the label turned by 90, 180 and 270 degrees, use the turn that finds the most confident text, and report text positions in the camera's own orientation. When the upright reading gives both, the system SHALL NOT read any turned copy.
+When the upright reading gives neither the medicine name nor the expiry, the system SHALL also read the averaged copy turned by 90, 180 and 270 degrees, use the turn that finds the most confident text, read every copy at that turn, and report text positions in the camera's own orientation. When the upright reading gives the name or the expiry, the system SHALL NOT read any turned copy.
 
 #### Scenario: Upside-down strip
 - **WHEN** the strip is held upside down
@@ -56,8 +56,8 @@ When the upright reading does not give both the medicine name and the expiry, th
 - **THEN** the system reads the label from the copy turned by 90 or 270 degrees, and any movement request uses directions in the camera's orientation
 
 #### Scenario: Upright strip
-- **WHEN** the upright reading gives the name and the expiry
-- **THEN** no turned copy is read
+- **WHEN** the upright reading gives the name or the expiry
+- **THEN** no turned copy is read, so a strip with its expiry on the other side is not slowed down
 
 ### Requirement: Shake with rotation
 The system SHALL align each frame to the sharpest frame for small rotations as well as shifts before averaging. If rotation alignment fails for a frame, the system SHALL use the shift-only alignment for that frame.

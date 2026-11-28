@@ -115,6 +115,10 @@ Before asking the user to move the medicine, the system SHALL check the camera. 
 - **WHEN** pictures are blurred by movement
 - **THEN** the system asks the user to hold the phone still, before any request to move the medicine
 
+#### Scenario: Moving but sharp
+- **WHEN** the frames moved but the sharpest frame is clear
+- **THEN** the system does not ask the user to hold still, because the cleaned image is used
+
 #### Scenario: Hazy camera
 - **WHEN** every frame stays hazy after cleaning and a retry
 - **THEN** the system suggests wiping the camera lens

@@ -28,6 +28,11 @@ All decisions are **Proposed**. None is agreed until we brainstorm this change.
 - **Plain English:** The app tries for five seconds to clean the picture before asking the user to move it.
 - **Pseudo-technical:** `process new frames until name and expiry are accepted or 5s have elapsed`
 
+### 5. Hold still only when no frame is sharp
+- **Status:** Agreed (user, 2026-11-28: "It keeps asking again and again")
+- **Plain English:** Movement between frames is only a problem if it blurred every frame. Cleaning keeps the sharpest frames and lines them up, so a moving hand with one sharp frame is not asked to hold still.
+- **Pseudo-technical:** `hold_still if quality.motion > LIMITS.motion and quality.sharpness < LIMITS.sharpness`
+
 ## High-level architecture flow
 ```text
 doubtful speech -> cross-check with camera text -> repeat or move somewhere quieter -> read label + confirm likely request -> repeat the question

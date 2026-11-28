@@ -36,7 +36,7 @@ All decisions are **Proposed**. None is agreed until we brainstorm this change.
 ### 6. Talk like a person, from fixed templates
 - **Status:** Agreed (user, 2026-11-28: "let it talk to user like a human rather than a robot")
 - **Plain English:** Answers are full sentences, the app says when it is still reading instead of going quiet, and it offers the next useful thing (the expiry, then the count) as a question. It never invents text: every sentence is a template, and the safety sentences are unchanged.
-- **Pseudo-technical:** `id.purpose = "This is {name}, {purpose}."; on first extra read with partlyRead(label): say look.still(name); after deliver(plain answer): next = first of [expiry, count] not asked this session and available; state.offer = {aspect: next}; say confirm.<next>`
+- **Pseudo-technical:** `id.purpose = "This is {name}, {purpose}."; on first extra read with partlyRead(label): say look.still(name); after deliver(plain answer): told += aspects said (identify -> all + expiry); next = first of [all, expiry, count] not told and available; state.offer = {aspect: next}; say confirm.<next>`
 
 ## High-level architecture flow
 ```text

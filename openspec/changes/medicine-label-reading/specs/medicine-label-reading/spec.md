@@ -103,7 +103,7 @@ When two medicine strips are in view, the system SHALL name each medicine that h
 - **THEN** the system names that one, says it cannot read the other, and gives the other no name or purpose
 
 ### Requirement: Conversational replies
-Replies SHALL sound like a person talking while every sentence still comes from a fixed template. Identification SHALL be said as a sentence ("This is Dolo 650, a fever tablet."). When a read takes longer than the first look and part of the label is already read, the system SHALL say once that it is still reading, naming what it has ("I can see Dolo 650. Hold it there, I'm still reading the rest."). After a medicine answer with no warning and no risk question, the system SHALL offer one thing it can still tell that the user has not asked in this session (the expiry, then the count when counting is available) as a yes-or-no question, and a "yes" SHALL be answered from the remembered label. The exact sentences required by the safety and failure-recovery rules SHALL NOT change.
+Replies SHALL sound like a person talking while every sentence still comes from a fixed template. Identification SHALL be said as a sentence ("This is Dolo 650, a fever tablet."). When a read takes longer than the first look and part of the label is already read, the system SHALL say once that it is still reading, naming what it has ("I can see Dolo 650. Hold it there, I'm still reading the rest."). After a medicine answer with no warning and no risk question, the system SHALL offer one thing it has not yet told in this session (what the medicine is, then the expiry, then the count when counting is available; identification tells the name and the expiry) as a yes-or-no question, and a "yes" SHALL be answered from the remembered label. The exact sentences required by the safety and failure-recovery rules SHALL NOT change.
 
 #### Scenario: Identified as a sentence
 - **WHEN** the user asks "What is this tablet?" about Dolo 650
@@ -114,15 +114,15 @@ Replies SHALL sound like a person talking while every sentence still comes from 
 - **THEN** the system says once that it can see the name and is still reading the rest
 
 #### Scenario: Offer what is left
-- **WHEN** the user has asked what the tablet is but not about the expiry
-- **THEN** the reply ends by asking whether they would like to know the expiry
+- **WHEN** the user has asked when the tablet expires but not what it is
+- **THEN** the reply ends by asking whether they would like to know what this medicine is
 
 #### Scenario: Offer accepted
 - **WHEN** the user says "yes" to the offer
-- **THEN** the expiry answer comes from the remembered label without reading the camera
+- **THEN** the answer comes from the remembered label without reading the camera
 
 #### Scenario: Nothing left to offer
-- **WHEN** the user has already asked about the expiry and the count, or counting is not available
+- **WHEN** the name, the expiry and the count have been told, or only the count is left and counting is not available
 - **THEN** no offer is made
 
 #### Scenario: No offer after a warning

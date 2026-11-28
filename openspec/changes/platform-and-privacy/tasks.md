@@ -14,3 +14,4 @@ One task per requirement. Spikes and review gates are in `design.md`, not here.
 - [ ] 1.8 [Requirement: Speech recognition speed] Measure recognition latency on a basic phone and meet the limit. Verify: "Latency measurement".
 - [ ] 1.9 [Requirement: Speech test coverage] Run the language, accent and mixed-speech tests and write the report. Verify: "Test report".
 - [x] 1.10 [Requirement: Logging] Add on-device logging and verify nothing is uploaded. Verify: "Interaction logged".
+- [ ] 1.11 [Requirement: Swappable vision engines] Put each engine behind an adapter chosen by TEXT_READER and POCKET_DETECTOR, with tests. Verify: "Device reader chosen", "Reader default", "Detector off", "Unknown engine name", "Engines shown, keys hidden".

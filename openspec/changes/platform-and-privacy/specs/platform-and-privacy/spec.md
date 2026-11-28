@@ -114,3 +114,26 @@ The system SHALL log its operation while preserving local-first privacy.
 #### Scenario: Interaction logged
 - **WHEN** an interaction completes
 - **THEN** a log entry exists on the device and is not uploaded
+
+### Requirement: Swappable vision engines
+Each vision job SHALL use an engine chosen in the server settings, through an adapter with fixed inputs and outputs, so that an engine is swapped by changing a setting and added by writing one adapter. `TEXT_READER` SHALL choose the label text reader: `google` (Google Cloud Vision on the server) or `device` (PaddleOCR in the browser); it SHALL default to `google` when the Vision key is set and `device` otherwise, and the device reader SHALL remain the fallback whenever the chosen reader gives no result. `POCKET_DETECTOR` SHALL choose the pocket detector: `roboflow` (the Roboflow YOLO models in `ROBOFLOW_MODEL_ID`) or `none`; it SHALL default to `roboflow`. An unknown value SHALL fall back to the default and be logged. The browser SHALL learn only which engines are in use.
+
+#### Scenario: Device reader chosen
+- **WHEN** `TEXT_READER=device` is set with a Vision key present
+- **THEN** labels are read on the device and Cloud Vision is never called
+
+#### Scenario: Reader default
+- **WHEN** `TEXT_READER` is not set
+- **THEN** the reader is `google` if the Vision key is set, otherwise `device`
+
+#### Scenario: Detector off
+- **WHEN** `POCKET_DETECTOR=none` is set
+- **THEN** no photo is sent to Roboflow and counting reports that it cannot count
+
+#### Scenario: Unknown engine name
+- **WHEN** `TEXT_READER=tesseract` is set
+- **THEN** the default reader is used and a warning is logged
+
+#### Scenario: Engines shown, keys hidden
+- **WHEN** the app status is sent to the browser
+- **THEN** it names the text reader and whether pocket detection is on, and contains no key

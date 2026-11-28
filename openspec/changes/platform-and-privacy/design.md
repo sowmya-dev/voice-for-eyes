@@ -52,6 +52,11 @@ nginx :3000 proxies /ws/stt and /api/* to backend :8000; SARVAM_API_KEY, ROBOFLO
 - **Plain English:** Checked on 2026-11-28 with one call on a made-up label: Cloud Vision read a bold red name running up the strip, the expiry across it and "1 x 15 Tablets" correctly, which the on-device reader does not. The app server sends the two sharpest colour frames, turns the words into lines with their real letter height, and the browser keeps two-frame agreement. With no key, no network, an error, a 10 s timeout or 20 calls in a minute, the on-device reader is used as before. Label photos now go to Google, recorded as departure D16.
 - **Pseudo-technical:** `POST /api/ocr {images: [jpeg, jpeg]} -> vision.googleapis.com/v1/images:annotate?key=… DOCUMENT_TEXT_DETECTION, languageHints [en] -> words joined into lines at LINE_BREAK / EOL_SURE_SPACE -> {pages: [{width, height, lines: [{text, score, box (axis-aligned), size (|v3 - v0|)}]}]}; browser: reading = agree(pages.map(extractFields)); on error -> PaddleOCR copies`
 
+### 11. Engines behind adapters, chosen in the settings
+- **Status:** Agreed (user, 2026-11-28: "Keep Google Cloud vision and YOLO swappable ... keep adapters, to swap")
+- **Plain English:** Reading label text and finding pockets are two jobs. Each has a small table of engines with the same inputs and outputs; a setting picks one, so Google Cloud Vision and the device reader, or the Roboflow YOLO model and "off", are swapped without code changes. A new engine is one more adapter in the table.
+- **Pseudo-technical:** `server: TEXT_READERS = {google: read_with_google}; POCKET_DETECTORS = {roboflow: detect_strip}; text_reader() = TEXT_READER in {google, device} else default; status -> {textReader, visionFallback}. browser: readers = {google: readCloud(colour frames), device: readOriented(PaddleOCR copies)}; read = readers[status.textReader] ?? device, falling back to device on null`
+
 ## High-level architecture flow
 ```text
 docker compose up -> nginx :3000 -> browser loads app and models -> cached

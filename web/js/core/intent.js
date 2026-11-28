@@ -24,7 +24,7 @@ const WHICH_TAKE = rx('(which|what) (medicine|tablet|pill|one)s? (should|can|do)
 const DOSE = rx('\\bdos(e|age)\\b', 'how (many|much)( \\w+)? (should|do|can|must) i (take|have)', 'how often', 'when (should|do) i take',
   'kitni( goli| goliyan| tablets?)? (leni|khani|loon|lu)', 'kab (leni|khani)', 'कितनी( गोली| गोलियां| गोलियाँ)? (लेनी|खानी|लूँ|लूं)', 'कब (लेनी|खानी)', 'खुराक', 'डोज', 'ఎన్ని( మాత్ర(లు)?)? (వేసుకోవాలి|తీసుకోవాలి)', 'మోతాదు', 'డోస్', 'ಎಷ್ಟು( ಮಾತ್ರೆ(ಗಳು|ಗಳನ್ನು)?)? (ತಗೊಳ್ಳ|ತೆಗೆದುಕೊಳ್ಳ)', 'ಡೋಸ್');
 const COUNT = rx('how many .*(left|remaining|there|in (this|the))', 'how many (tablets|pills|capsules)', '\\bcount\\b',
-  'kitni( goli| goliyan| tablets?)? (bachi|baki|bacha|hain)', 'कितनी( गोली| गोलियां| गोलियाँ| tablets?)? (बची|बाकी|बचीं|हैं)', 'ఎన్ని( మాత్రలు| టాబ్లెట్లు)? (మిగిలా|ఉన్నా)', 'ಎಷ್ಟು( ಮಾತ್ರೆಗಳು)? (ಉಳಿದಿ|ಇವೆ)');
+  'kitni( goli| goliyan| tablets?)? (bachi|baki|bacha|hain)', 'कितन(ी|े)( \\S+)? (बची|बाकी|बचीं|बचे|हैं)', 'ఎన్ని( \\S+)? (మిగిలా|ఉన్నా)', 'ಎಷ್ಟು( \\S+)? (ಉಳಿದಿ|ಇವೆ)');
 const WARNINGS = rx('\\bsafe\\b', 'side effects?', '\\bwarnings?\\b', 'pregnan', 'diabet', 'सुरक्षित', 'సురక్షిత', 'ಸುರಕ್ಷಿತ');
 const NUTRITION = rx('nutrition', 'calorie', 'protein', '\\bsugar\\b', 'carbohydrate', '\\bfat\\b', 'sodium', '\\benergy\\b', 'पोषण', 'प्रोटीन', 'पोषक', 'పోషక', 'ప్రోటీన్', 'ಪೌಷ್ಟಿಕ', 'ಪ್ರೋಟೀನ್');
 const EXPIRY = rx('expir', '\\bexp\\b', 'best before', 'एक्सपायर', 'एक्स्पायर', 'समाप्ति', 'खराब', 'kab tak', 'గడువు', 'ఎక్స్పైర', 'ఎక్స్పైరీ', 'ಅವಧಿ', 'ಎಕ್ಸ್ಪೈರ');

@@ -112,6 +112,7 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
   const state = {
     lang, turn: 0, view: blankView(lang), history: [],
     pinned: false, // set once the user names a language: no automatic switching after that
+    speechLang: null, // the language speech recognition is set to; null while it detects automatically
     risk: null, // { text, view, name, asked, reasked }
     unclear: 0, // step reached in the noisy-speech ladder
     offer: null, // { aspect } while "Do you want to know ...?" waits for a yes
@@ -557,6 +558,7 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
     if (intent.name === 'language') {
       state.lang = namedLanguage(said);
       state.pinned = true;
+      state.speechLang = state.lang;
       ports.setSpeechLanguage?.(state.lang); // recognition is set to the named language
       update({});
       await speak([seg('lang.changed')]);
@@ -568,6 +570,12 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
     // Short Latin-script replies such as "yes" or "Avunu" do not switch the language.
     if (!state.pinned && !isConfirm(said) && (clean(said).split(' ').length > 2 || /[^\u0000-\u007f]/.test(said))) {
       state.lang = nextLanguage(state.lang, detectLanguage(said, sttLang, probability), null);
+      // Automatic recognition writes Indian languages in English letters, so once one is found, recognition
+      // is set to it and later questions come back in its own script.
+      if (state.lang !== 'en' && state.speechLang !== state.lang) {
+        state.speechLang = state.lang;
+        ports.setSpeechLanguage?.(state.lang);
+      }
     }
 
     const notARequest = intent.name === 'unknown' || intent.name === 'yes';

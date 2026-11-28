@@ -35,11 +35,50 @@ test('a named language is pinned: recognition follows and detection stops switch
   assert.equal(t.view().lang, 'hi');
 });
 
-test('before a language is named, detection still switches and recognition stays automatic', async () => {
+// The server turns romanised speech into its own script and names the base language (probability 1).
+const BASE = (lang) => ({ sttLang: lang, probability: 1 });
+
+test('Confident detection: the session switches and recognition follows the language found', async () => {
   const t = setup();
   await t.hear('यह कौन सी गोली है', { sttLang: 'hi-IN', probability: 0.99 });
   assert.equal(t.view().lang, 'hi');
+  assert.deepEqual(t.speechLanguages, ['hi']);
+});
+
+test('First Telugu question from the landing screen: reading screen, reply and recognition in Telugu', async () => {
+  const t = setup();
+  assert.equal(t.view()?.screen ?? '1', '1');
+  await t.hear('ఈ మాత్రం ఏంటి?', BASE('te-IN'));
+  assert.ok(t.views.some((v) => v.screen === 'reading' && v.lang === 'te'), 'the reading screen is already in Telugu');
+  assert.equal(t.said[0].lang, 'te');
+  assert.deepEqual(t.speechLanguages, ['te']);
+});
+
+test('Telugu mixed with English: switched, and understood as an expiry question', async () => {
+  const t = setup();
+  await t.hear('ఈ ట్యాబ్లెట్ ఎక్స్పైరీ ఎప్పుడు?', BASE('te-IN'));
+  assert.equal(t.said[0].lang, 'te');
+  assert.match(t.said[0].text, /^గడువు/);
+});
+
+test('Hindi mixed with English: switched, and understood as an expiry question', async () => {
+  const t = setup();
+  await t.hear('इस टैबलेट की एक्सपायरी कब है', BASE('hi-IN'));
+  assert.equal(t.said[0].lang, 'hi');
+  assert.match(t.said[0].text, /^एक्सपायरी/);
+});
+
+test('Identification unavailable: romanised speech labelled English keeps the current language', async () => {
+  const t = setup();
+  await t.hear('Ee maatra enti?', { sttLang: 'en-IN', probability: 0 });
+  assert.equal(t.view().lang, 'en');
   assert.deepEqual(t.speechLanguages, []);
+});
+
+test('Telugu, Hindi and Kannada count questions as written after transliteration', () => {
+  for (const text of ['ఇది ఎన్ని టాబ్లెట్స్ ఉన్నాయి', 'कितने tablets बचे हैं', 'ಎಷ್ಟು ಮಾತ್ರೆಗಳು ಉಳಿದಿವೆ']) {
+    assert.deepEqual(route(text), { name: 'identify', aspect: 'count' }, text);
+  }
 });
 
 test('a single word with an added ending still names the language', () => {

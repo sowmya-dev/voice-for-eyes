@@ -39,7 +39,8 @@ export function createStt({ onPartial, onFinal, onState }) {
         backoff = 1000;
         onState('listening');
       } else if (message.event === 'transcript.partial') onPartial(message.text);
-      else if (message.event === 'transcript.final') onFinal({ text: message.text, sttLang: message.language ?? null, probability: Number(message.language_confidence ?? 0) });
+      // The server names the base language from the words when recognition is automatic (base_language).
+      else if (message.event === 'transcript.final') onFinal({ text: message.text, sttLang: message.base_language ?? message.language ?? null, probability: message.base_language ? 1 : Number(message.language_confidence ?? 0) });
       else if (message.event === 'error' && message.is_fatal) {
         if (['key_not_set', 'invalid_subscription_key'].includes(message.code)) blocked = message.code;
         onState('unavailable', message.code);

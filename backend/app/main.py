@@ -31,6 +31,8 @@ log = logging.getLogger("voai")
 app = FastAPI(title="Voice for Eyes", docs_url=None, redoc_url=None, openapi_url=None)
 
 STT_LANGUAGES = {"auto", "en-IN", "hi-IN", "te-IN", "kn-IN"}
+BASE_LANGUAGES = STT_LANGUAGES - {"auto"}  # languages the app has replies for
+LID_TIMEOUT_S = 2.0  # language identification and transliteration together, before giving up
 MAX_AUDIO_CHARS = 64_000  # one base64 audio frame
 MAX_IMAGE_CHARS = 4_000_000
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
@@ -286,11 +288,31 @@ async def from_browser(socket: WebSocket, upstream) -> None:
             return
 
 
-async def to_browser(socket: WebSocket, upstream) -> None:
+async def identify_base_language(key: str, text: str) -> dict:
+    """Automatic recognition writes Telugu, Hindi and Kannada speech in English letters and labels it en-IN,
+    so the base language is identified from the words, and English letters are turned into that language's script."""
+    from sarvamai import AsyncSarvamAI
+
+    text_api = AsyncSarvamAI(api_subscription_key=key).text
+    found = await text_api.identify_language(input=text)
+    if found.language_code not in BASE_LANGUAGES:
+        return {}  # no reply text in the app for it: the session language stays
+    if found.language_code != "en-IN" and found.script_code == "Latn":
+        text = (await text_api.transliterate(input=text, source_language_code="en-IN",
+                                             target_language_code=found.language_code)).transliterated_text
+    return {"base_language": found.language_code, "text": text}
+
+
+async def to_browser(socket: WebSocket, upstream, identify=None) -> None:
     async for message in upstream:
         if isinstance(message, bytes):
             continue
         data = message if isinstance(message, dict) else message.dict()
+        if identify and data.get("event") == "transcript.final" and str(data.get("text", "")).strip():
+            try:
+                data = {**data, **await asyncio.wait_for(identify(data["text"]), LID_TIMEOUT_S)}
+            except Exception as error:  # too slow or failed: the transcript goes on as it came
+                log.warning("language identification failed: %s", type(error).__name__)
         await socket.send_json(data)
 
 
@@ -310,7 +332,9 @@ async def speech(socket: WebSocket, language_code: str = "auto"):
     try:
         async with connect_sarvam(key, **options) as upstream:
             log.info("speech stream open")
-            tasks = [asyncio.create_task(from_browser(socket, upstream)), asyncio.create_task(to_browser(socket, upstream))]
+            # Only automatic recognition needs the base language worked out from the words.
+            identify = (lambda text: identify_base_language(key, text)) if language_code == "auto" else None
+            tasks = [asyncio.create_task(from_browser(socket, upstream)), asyncio.create_task(to_browser(socket, upstream, identify))]
             done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
             # After a browser "end", give Sarvam a moment to send the last transcript.
             if tasks[0] in done and tasks[0].exception() is None and pending:

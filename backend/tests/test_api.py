@@ -199,6 +199,62 @@ def test_speech_relay_passes_audio_and_transcripts_with_the_contract_settings(mo
                             "silence_duration_ms": "800"}
 
 
+def relay_one(monkeypatch, language_code, text, identify):
+    """Streams one utterance through /ws/stt and returns the transcript the browser gets."""
+    monkeypatch.setenv("SARVAM_API_KEY", "k")
+
+    class Speaking(FakeSarvam):
+        async def __aiter__(self):
+            yield {"event": "session.begin", "request_id": "r1"}
+            await self.heard.wait()
+            yield {"event": "transcript.final", "utterance_idx": 0, "text": text, "language": "en-IN"}
+
+    fake = Speaking()
+
+    class Connection:
+        async def __aenter__(self):
+            return fake
+
+        async def __aexit__(self, *_):
+            return False
+
+    monkeypatch.setattr(main, "connect_sarvam", lambda key, **options: Connection())
+    monkeypatch.setattr(main, "identify_base_language", identify)
+    with client.websocket_connect(f"/ws/stt?language_code={language_code}", headers=ORIGIN) as socket:
+        socket.receive_json()
+        socket.send_text(json.dumps({"event": "audio_input", "audio": "AAAA"}))
+        return socket.receive_json()
+
+
+def test_romanised_telugu_is_identified_and_written_in_telugu(monkeypatch):
+    async def identify(key, text):
+        assert text == "Ee maatra enti?"
+        return {"base_language": "te-IN", "text": "ఈ మాత్రం ఏంటి?"}
+
+    final = relay_one(monkeypatch, "auto", "Ee maatra enti?", identify)
+    assert (final["text"], final["base_language"]) == ("ఈ మాత్రం ఏంటి?", "te-IN")
+
+
+def test_identification_failure_or_delay_keeps_the_transcript(monkeypatch):
+    async def fails(key, text):
+        raise RuntimeError("down")
+
+    async def slow(key, text):
+        await asyncio.sleep(5)
+
+    monkeypatch.setattr(main, "LID_TIMEOUT_S", 0.1)
+    for identify in (fails, slow):
+        final = relay_one(monkeypatch, "auto", "Ee maatra enti?", identify)
+        assert final["text"] == "Ee maatra enti?" and "base_language" not in final
+
+
+def test_a_stream_set_to_a_language_is_not_identified_again(monkeypatch):
+    async def never(key, text):
+        raise AssertionError("must not be called")
+
+    assert relay_one(monkeypatch, "te-IN", "ఈ మాత్ర ఏమిటి", never)["text"] == "ఈ మాత్ర ఏమిటి"
+
+
 def test_speech_reports_a_refused_stream(monkeypatch):
     monkeypatch.setenv("SARVAM_API_KEY", "k")
 

@@ -111,6 +111,11 @@ camera cues: "hold the phone still" (motion blur), "please wipe the camera lens"
 - **Plain English:** Several strip models can be listed and are tried in order. Their class names can be renamed to ours. A count is only spoken when at least one full pocket is seen, so a model that cannot see tablets can never say "zero".
 - **Pseudo-technical:** `for model in ROBOFLOW_MODEL_ID.split(','): r = to_strip_result(rename(predictions, ROBOFLOW_CLASS_MAP)); if r.strip and (r.full or r.empty): return r; reliableCount requires full.length >= 1`
 
+### 17. The configured model sees used cells, not full ones
+- **Status:** Agreed (user, 2026-11-28: "OCR + blister should work together")
+- **Plain English:** Measured on 2026-11-28 on the model's own 105 held-out images (test and valid): `blister-strips-defect-detection/2` labels `missing` (an empty, used cell), `cracked` (a cracked pill still in its pocket) and `broken` (a broken or cut-off pill); it has no full-pocket class, and its `strip` labels were added after version 2 was trained, so it never finds the strip. Its number of empty cells per image was exact on 96/105 at 0.5 confidence and 98/105 at 0.7 (the other 7 one too many, never too few). So it is used for empty cells only: `ROBOFLOW_CLASS_MAP=missing=empty_cavity`, confidence 0.7, and the count is the printed total minus the empty cells.
+- **Pseudo-technical:** `to_strip_result(minimum=0.7); chain accepts the first model with full or empty pockets; countFrames -> { count: agreed full count (whole strip), empty: agreed empty count }`
+
 ## High-level architecture flow
 ```text
 camera frames -> sharpness ranking -> top 5 -> align + average -> [averaged]

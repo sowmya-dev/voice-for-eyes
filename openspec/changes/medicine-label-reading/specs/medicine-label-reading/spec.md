@@ -128,3 +128,22 @@ Replies SHALL sound like a person talking while every sentence still comes from 
 #### Scenario: No offer after a warning
 - **WHEN** the answer carries the expired warning or asks "Do you understand the risk?"
 - **THEN** no offer is made
+
+### Requirement: Count from the printed total
+The label and the strip SHALL be used together. The system SHALL read the printed pack size from the label (such as "10 Tablets", "10 Capsules", "1 x 10", "10x10 Tablets" or "Strip of 10"), keep it with the remembered label, and, when no full-pocket count is available but the strip model reports empty pockets in two agreeing frames, SHALL give the printed total minus the empty pockets, saying how it was worked out ("The strip holds 10. I can see 3 used, so 7 should be left."). If the empty pockets are known but the printed total is not, the system SHALL ask the user to show the side that says how many the strip holds, read it, and then answer. It SHALL NOT give a count when more pockets are empty than the strip holds.
+
+#### Scenario: Worked out from the print
+- **WHEN** the label says "10 Tablets" and both frames show 3 empty pockets
+- **THEN** the system says the strip holds 10, 3 are used, and 7 should be left
+
+#### Scenario: Printed total not read yet
+- **WHEN** 3 empty pockets are seen but the printed total has not been read
+- **THEN** the system asks to see the side with the pack size, reads it, and then gives the count
+
+#### Scenario: Pack size written as 1 x 10
+- **WHEN** the label says "1 x 10 Tablets" or "Strip of 10 Capsules"
+- **THEN** the printed total is 10
+
+#### Scenario: More empty than printed
+- **WHEN** the label says 10 and 12 empty pockets are reported
+- **THEN** no count is given

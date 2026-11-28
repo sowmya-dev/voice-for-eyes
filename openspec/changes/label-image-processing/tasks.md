@@ -11,6 +11,6 @@ One task per requirement. Spikes and review gates are in `design.md`, not here.
 - [ ] 1.5 [Requirement: Difficult labels] Collect blurred, glared and embossed sample strips with known values and run the accuracy check. Verify: "Sample strips".
 - [x] 1.6 [Requirement: Turned label] Find each missing field at its own turn, confirmed by a second copy, keep upright fields and map boxes back to camera orientation, with tests. Verify: "Upside-down strip", "Sideways strip", "Upright strip", "Vertical name, horizontal expiry".
 - [x] 1.7 [Requirement: Shake with rotation] Align frames with rotation-aware ECC, falling back to shift-only alignment, with tests. Verify: "Tilting hand", "Alignment fails".
-- [x] 1.8 [Requirement: Colour frames for counting] Send the two sharpest original colour frames for counting and require agreement, with tests. Verify: "Counted from colour frames", "Frames disagree".
-- [x] 1.9 [Requirement: Strip model chain] Try listed models in order with class renaming, with tests. Verify: "First model finds nothing", "Class names mapped", "No model finds a strip".
+- [ ] 1.8 [Requirement: Colour frames for counting] Send the two sharpest original colour frames for counting and require agreement, with tests. Verify: "Counted from colour frames", "Frames disagree", "Empty pockets agree".
+- [ ] 1.9 [Requirement: Strip model chain] Try listed models in order with class renaming, with tests. Verify: "First model finds nothing", "Class names mapped", "No model finds a strip".
 - [x] 1.10 [Requirement: Count needs a full pocket] Reject counts with no full pocket, with tests. Verify: "Model without a full-pocket class", "Full pockets found".

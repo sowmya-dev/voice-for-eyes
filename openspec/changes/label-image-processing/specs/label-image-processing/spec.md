@@ -75,7 +75,7 @@ The system SHALL align each frame to the sharpest frame for small rotations as w
 - **THEN** that frame is aligned by shift only and cleaning still finishes
 
 ### Requirement: Colour frames for counting
-The system SHALL send the two sharpest original colour frames to the strip model, not the cleaned black-and-white copies, and SHALL accept a count only when both frames give the same reliable count.
+The system SHALL send the two sharpest original colour frames to the strip model, not the cleaned black-and-white copies, and SHALL accept a count of full pockets, or a number of empty pockets, only when both frames give the same number.
 
 #### Scenario: Counted from colour frames
 - **WHEN** both colour frames show the whole strip with the same number of full pockets
@@ -85,11 +85,15 @@ The system SHALL send the two sharpest original colour frames to the strip model
 - **WHEN** the two frames give different counts
 - **THEN** no count is accepted
 
+#### Scenario: Empty pockets agree
+- **WHEN** a model with no full-pocket class finds 3 empty pockets in both frames and no strip
+- **THEN** 3 empty pockets are reported, and no count of full pockets
+
 ### Requirement: Strip model chain
-The system SHALL try each strip model listed in `ROBOFLOW_MODEL_ID` in order, rename predicted classes through `ROBOFLOW_CLASS_MAP` before using them, and use the first model that finds a strip and at least one pocket.
+The system SHALL try each strip model listed in `ROBOFLOW_MODEL_ID` in order, rename predicted classes through `ROBOFLOW_CLASS_MAP` before using them, and use the first model that finds at least one full or empty pocket. Predictions below 0.7 confidence SHALL be ignored.
 
 #### Scenario: First model finds nothing
-- **WHEN** the first model finds no strip and the second model finds one with pockets
+- **WHEN** the first model finds no pockets and the second model finds some
 - **THEN** the second model's result is used
 
 #### Scenario: Class names mapped
@@ -97,11 +101,11 @@ The system SHALL try each strip model listed in `ROBOFLOW_MODEL_ID` in order, re
 - **THEN** its predictions are used as those classes
 
 #### Scenario: No model finds a strip
-- **WHEN** no listed model finds a strip with pockets
+- **WHEN** no listed model finds a full or empty pocket
 - **THEN** no count is accepted and the existing whole-strip retries apply
 
 ### Requirement: Count needs a full pocket
-The system SHALL accept a count only when at least one full pocket is found, so that a model that cannot see tablets never reports zero.
+The system SHALL accept a count of the full pockets it can see only when the whole strip and at least one full pocket are found, so that a model that cannot see tablets never reports zero. A model with no full-pocket class SHALL only report empty pockets, for the count worked out from the printed total.
 
 #### Scenario: Model without a full-pocket class
 - **WHEN** the strip and empty pockets are found but no full pocket

@@ -88,6 +88,17 @@ test('Full pockets found: the number of full pockets is the count', () => {
   assert.equal(reliableCount({ strip, full: [box, box, box], empty: [box] }, 1, size), 3);
 });
 
+test('Strip not fully visible: a strip that reaches the edge of the frame gives no count', () => {
+  const full = [box, box, box];
+  for (const cut of [{ ...strip, x: 5 }, { ...strip, y: 5 }, { ...strip, x: 880 }, { ...strip, y: 510 }]) {
+    assert.equal(reliableCount({ strip: cut, full, empty: [] }, 1, size), null, JSON.stringify(cut));
+  }
+  assert.equal(reliableCount({ strip: { x: 16, y: 16, w: 1248, h: 688 }, full, empty: [] }, 1, size), 3, 'just inside the margin');
+  // Boxes come back in pixels of the picture that was sent; the margin is measured on the camera frame.
+  assert.equal(reliableCount({ strip: { x: 10, y: 10, w: 200, h: 100 }, full, empty: [] }, 0.5, size), 3, '10 px in a half-size picture is 20 px in the frame');
+  assert.equal(reliableCount({ strip: { x: 50, y: 50, w: 586, h: 100 }, full, empty: [] }, 0.5, size), null, '636 of 640 px wide is the edge of the frame');
+});
+
 test('Model without a full-pocket class: no count is accepted', () => {
   assert.equal(reliableCount({ strip, full: [], empty: [box, box] }, 1, size), null);
 });
@@ -106,19 +117,31 @@ test('Counted from colour frames: the two sharpest original frames are sent and 
 
 test('Frames disagree: no count is accepted', async () => {
   assert.equal((await countFrames(colourFrames, [0, 1], async (f) => pockets(f.i ? 5 : 4))).count, null);
-  assert.deepEqual(await countFrames(colourFrames, [0, 1], async () => null), { count: null, empty: null });
+  assert.deepEqual(await countFrames(colourFrames, [0, 1], async () => null), { count: null, empty: null, strips: 0 });
 });
 
 // A model with only used-cell detections (no strip, no full pockets): empty pockets must agree too.
 const used = (n) => ({ strip: null, full: [], empty: Array(n).fill(box) });
 
 test('Empty pockets agree: reported with no full-pocket count', async () => {
-  for (const n of [1, 3, 9]) assert.deepEqual(await countFrames(colourFrames, [0, 1], async () => used(n)), { count: null, empty: n });
+  for (const n of [1, 3, 9]) assert.deepEqual(await countFrames(colourFrames, [0, 1], async () => used(n)), { count: null, empty: n, strips: 0 });
 });
 
 test('Empty pockets disagree, or none seen: nothing reported', async () => {
   assert.equal((await countFrames(colourFrames, [0, 1], async (f) => used(f.i ? 2 : 3))).empty, null);
   assert.equal((await countFrames(colourFrames, [0, 1], async () => used(0))).empty, null, 'no empty pocket may mean no strip in view');
   assert.equal((await countFrames(colourFrames, [0, 1], async (f) => (f.i ? null : used(2)))).empty, null);
-  assert.deepEqual(await countFrames(colourFrames, [0], async () => used(2)), { count: null, empty: null }, 'two frames are needed');
+  assert.deepEqual(await countFrames(colourFrames, [0], async () => used(2)), { count: null, empty: null, strips: 0 }, 'two frames are needed');
+});
+
+test('No outline, no count: pills pointed at with no strip outline are not a count', () => {
+  assert.equal(reliableCount({ strip: null, full: Array(7).fill(box), empty: [] }, 1, size), null);
+});
+
+test('the number of strips a detector outlined is passed on', async () => {
+  const several = { strip: null, full: [], empty: [], strips: 2 };
+  assert.deepEqual(await countFrames(colourFrames, [0, 1], async () => several), { count: null, empty: null, strips: 2 });
+  assert.equal((await countFrames(colourFrames, [0, 1], async (f) => (f.i ? several : pockets(4)))).strips, 2, 'either frame seeing two is enough');
+  assert.equal((await countFrames(colourFrames, [0, 1], async () => pockets(4))).strips, 0, 'a detector that outlines no strips reports none');
+  assert.deepEqual(await countFrames(colourFrames, [0, 1], async () => ({ ...pockets(4), strips: 1 })), { count: 4, empty: null, strips: 1 });
 });

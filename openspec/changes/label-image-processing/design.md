@@ -5,6 +5,8 @@ Turns camera frames into trusted label fields. `mvp/VoiceLoop.kt` returns a hard
 
 **As built (2026-11-28):** Built: 7 frames, top 5 by Laplacian variance, shift-only alignment by template match, bilateral filter (OpenCV.js has no non-local-means), CLAHE, unsharp mask, 2x, adaptive threshold, in a web worker; PP-OCRv5 Mobile through `@paddleocr/paddleocr-js` with detection capped at 736 px on 4 WASM threads. On a 12-thread laptop in headless Chrome one read takes about 10 s (about 2.5 s per copy). Not built: the YOLOv8n model (no trained weights). The Roboflow projects checked on 2026-11-28 cannot count tablets: SASTRA blister_pack_28th_aug_2023 v1 has only defect and empty-pocket classes, blister packet identification has 3 images and no model, and blister-pack-9t2sb is labelled by drug name. The fallback endpoint is built but stays off until ROBOFLOW_MODEL_ID names a model with the classes medicine_strip, full_cavity and empty_cavity.
 
+**As built (2026-11-29):** The `sam3` pocket detector (decision 18) is built in `backend/app/main.py` as `detect_with_sam3`, chosen with `POCKET_DETECTOR=sam3` and never the default. It is tested on the eight saved replies in [`backend/tests/fixtures/sam3/`](../../../backend/tests/fixtures/sam3), and the half-used Diazepam strip it gets wrong is kept as an expected failure in `backend/tests/test_sam3.py`, so the limit stays visible. Every pocket result can now say how many strips were outlined, and a strip that reaches the edge of the frame, or pills with no outline, give no count. Not built: the second opinion (decision 19) and Molmo (decision 20). Not checked: `sam3` has run only on the saved replies, never through the running app, and the time one call takes against the browser's 15 second limit is not measured.
+
 **Fallbacks for turned, shaken and uncounted strips (2026-11-28):** built at the user's request ("Fix things now"); decisions 12-16 below. Causes found on 2026-11-28, from the code (no captured frames were available):
 - OCR (PP-OCRv5 mobile det + rec) has no orientation step, so it reads only upright text lines. Taking a photo re-runs the same OCR, so it fails the same way.
 - Frames were aligned by shift only (`cleanup.js`, marked as a shortcut), so a tilting hand blurred the averaged copy.
@@ -117,7 +119,7 @@ camera cues: "hold the phone still" (motion blur), "please wipe the camera lens"
 - **Pseudo-technical:** `to_strip_result(minimum=0.7); chain accepts the first model with full or empty pockets; countFrames -> { count: agreed full count (whole strip), empty: agreed empty count }`
 
 ### 18. Find pills by name: SAM 3 measured, Molmo next in line
-- **Status:** SAM 3 as a detector that can be chosen, never the default: agreed to build (user, 2026-11-29: "kick off dev, will take the 3 decisions later"). Molmo: Proposed and blocked (decision 20); the user asked on 2026-11-28 to try it next.
+- **Status:** SAM 3 as a detector that can be chosen, never the default: Agreed and built (user, 2026-11-29: "kick off dev, will take the 3 decisions later"). Molmo: Proposed and blocked (decision 20); the user asked on 2026-11-28 to try it next.
 - **Plain English:** The trained strip model sees only used pockets, on one kind of strip, and Google Cloud Vision's object detection sees no pills at all (4 "Coin" on a strip of 10). A detector that is told what to look for works on any strip. SAM 3 on Roboflow was measured on 12 hand-counted photos (decision 20). It outlined every one of the 15 strips in the 8 varied photos and never took a box for a strip, which also answers "is the whole strip in view". With pills counted only inside the outline and above 0.7 it was exact on 8 of the 10 strips whose pills show through clear pockets; it left out loose pills, capsules printed on a box and printed foil backs; it missed one strip of flat red tablets completely; and it was confidently wrong once: on a half-used strip it scored the 5 torn-open pockets 0.82-0.88, as high as real tablets, and would have said 10 for 5. So it is good at the outline and usually right on the number, but not safe alone. Molmo is built to point at and count things, so it is the next to try, as the second opinion.
 - **Pseudo-technical:** `sam3: POST {ROBOFLOW_API_URL}/sam3/concept_segment {model_id: sam3/sam3_final, prompts: [{type: text, text: "pill"}, {type: text, text: "blister pack"}], output_prob_thresh: 0.5, format: polygon} -> prompt_results[i].predictions[j] = {masks: polygons, confidence}; exactly one "blister pack" outline -> strip = its box; full = pills with confidence >= 0.7 whose centre is inside the outline; empty = []; strips = 1. Any other number of outlines n -> strip = null, full = [], strips = n. molmo: OpenRouter chat/completions {model: allenai/molmo-2-8b:free, user: [text "Point to each pill that is still in the blister pack.", image]} -> its point markup parsed -> one full pocket per point; strip = null`
 
@@ -129,7 +131,7 @@ camera cues: "hold the phone still" (motion blur), "please wipe the camera lens"
 ### 20. The trial that gates any new counter
 - **Status:** Proposed. Step 1 is blocked: on 2026-11-28 OpenRouter knew `allenai/molmo-2-8b:free` and `allenai/molmo-2-8b` ("AllenAI: Molmo2 8B", image and video in, text out) but listed 0 serving endpoints for both and left them out of its public model list, so a request would fail until a provider serves the model.
 - **Plain English:** Before a counter is switched on, it is run once on the same 12 hand-counted photos. It may say "I can't count this", but it must never state a wrong number. SAM 3 has been run (12 calls); Molmo is next, as soon as it is being served.
-- **Pseudo-technical:** `1. GET openrouter.ai/api/v1/models/{id}/endpoints has at least one endpoint, else stop (no key is used for this check). 2. One call per photo per detector, replies saved under trial/, so no photo is asked twice: at most 12 calls each. 3. Per strip: exact | no count | wrong against the hand count, pills counted inside the SAM 3 outline. 4. Switched on by default only if: 0 wrong on any strip; exact on at least 8 of the 10 clear-pocket strips in C1-C8; no loose pill or printed picture counted; a count from two frames within 10 seconds. 5. The result is recorded here and D17 is decided.`
+- **Pseudo-technical:** `1. GET openrouter.ai/api/v1/models/{id}/endpoints has at least one endpoint, else stop (no key is used for this check). 2. One call per photo per detector, replies saved with the tests (backend/tests/fixtures/), so no photo is asked twice: at most 12 calls each. 3. Per strip: exact | no count | wrong against the hand count, pills counted inside the SAM 3 outline. 4. Switched on by default only if: 0 wrong on any strip; exact on at least 8 of the 10 clear-pocket strips in C1-C8; no loose pill or printed picture counted; a count from two frames within 10 seconds. 5. The result is recorded here and D17 is decided.`
 
 The 12 photos, all 1280 px wide. P1-P4 are held-out images of the Roboflow project `blister-strips-defect-detection`, version 2 (one kind of strip: white tablets in a blue blister). C1-C8 are from Wikimedia Commons, named by their file title, under the licence shown.
 
@@ -148,7 +150,7 @@ The 12 photos, all 1280 px wide. P1-P4 are held-out images of the Roboflow proje
 | C7 | `File:Diazepam, strips 10 mg (Valium).jpg` (CC BY-SA 4.0) | 2 strips: 5 tablets with 5 torn-open pockets; a printed foil back; 1 loose tablet | **10** and 0: wrong (torn pockets 0.82-0.88, tablets 0.89-0.92) |
 | C8 | `File:Anterone (cyproterone acetate) tablets in Australia, with two obverse and one reverse blister packs.jpg` (CC BY-SA 4.0) | 3 strips: 10 tablets; 10 tablets; a printed foil back | 10, 10 and 0 (one tablet at 0.76; 6 false marks on the foil back at 0.50-0.67 dropped) |
 
-SAM 3 so far: all 15 strips in C1-C8 outlined (0.84-0.93) and no box outlined; of the 10 clear-pocket strips, 8 exact, 1 missed (no count) and 1 wrong, so it fails the "0 wrong" bar on its own. Other words: "capsule" (tried on C1-C8) counted the capsule strips as well as "pill" did, with a wider gap on C1 (real capsules 0.84-0.86, used pockets 0.51-0.59), but found nothing on the tablet strips; "tablet" (C1-C8) found nothing on any photo; "empty blister pocket" (P1-P4, two of which show a used pocket) found nothing. So "pill" is the one word that covers tablets and capsules, and used pockets cannot be asked for by name. Its replies for C1-C8 are kept in [`trial/sam3/`](trial/sam3) so that the Molmo run can use the same outlines without asking again.
+SAM 3 so far: all 15 strips in C1-C8 outlined (0.84-0.93) and no box outlined; of the 10 clear-pocket strips, 8 exact, 1 missed (no count) and 1 wrong, so it fails the "0 wrong" bar on its own. Other words: "capsule" (tried on C1-C8) counted the capsule strips as well as "pill" did, with a wider gap on C1 (real capsules 0.84-0.86, used pockets 0.51-0.59), but found nothing on the tablet strips; "tablet" (C1-C8) found nothing on any photo; "empty blister pocket" (P1-P4, two of which show a used pocket) found nothing. So "pill" is the one word that covers tablets and capsules, and used pockets cannot be asked for by name. Its replies for C1-C8 are kept in [`backend/tests/fixtures/sam3/`](../../../backend/tests/fixtures/sam3), where the tests of the `sam3` detector use them, and so that the Molmo run can use the same outlines without asking again.
 
 ## High-level architecture flow
 ```text
@@ -157,7 +159,8 @@ camera frames -> sharpness ranking -> top 5 -> align + average -> [averaged]
                   3 copies -> OCR each -> field extraction -> two-copy agreement -> LabelReading
 camera frames -> sharpness, haze, motion -> camera cue (until the camera is fixed)
 [averaged], [enhanced] -> YOLOv8n-seg -> strip, label, expiry, cavities -> whole-strip check + count agreement
-proposed count: 2 sharpest colour frames -> sam3 (outline + pills by name) [+ molmo (points inside the outline)] -> same number from both, and from both frames -> visible count
+count with POCKET_DETECTOR=sam3: 2 sharpest colour frames -> sam3 (outline + pills by name) -> same number from both frames -> visible count
+proposed: + molmo (points inside the outline) -> the same number from both detectors as well
 boxes + OCR -> strip cue (one direction at a time) or lock frame
 ```
 
@@ -172,7 +175,7 @@ boxes + OCR -> strip cue (one direction at a time) or lock frame
 | CameraCheck | blur, haze and motion checks | gives camera cues before strip cues |
 | RoboflowFallback | FastAPI endpoint calling Roboflow with inference-sdk | used only when BlisterModel gives no result |
 | CountAgreement | accepts a count only when two copies match | fills LabelReading.visibleCount |
-| Sam3Detector (proposed) | SAM 3 on Roboflow: the strip outline and every pill, by name | pocket-detector adapter `sam3` |
+| Sam3Detector | SAM 3 on Roboflow: the strip outline and every pill, by name | pocket-detector adapter `sam3`, chosen with `POCKET_DETECTOR=sam3` |
 | MolmoDetector (proposed) | Molmo on OpenRouter: one point per pill, parsed from its reply | pocket-detector adapter `molmo`; gives no outline, so it is a second opinion only |
 | SecondOpinion (proposed) | accepts a frame's count only when two detectors give the same number inside the outline | used when `POCKET_DETECTOR` joins two detectors with `+` |
 | GuidanceAdvisor | picks the next cue from boxes and sharpness | gives GuidanceCue to failure-recovery |
@@ -206,7 +209,7 @@ ocr.read(ProcessedCopy) -> OcrLine[]
 label.agree(OcrLine[]) -> LabelReading
 blister.detect(ProcessedCopy) -> StripDetection
 vision.fallback(Frame) -> StripDetection   (POST /api/vision/fallback; needs network and ROBOFLOW_API_KEY)
-pockets.sam3(Frame) -> PocketResult        (proposed; Roboflow /sam3/concept_segment with the words "pill" and "blister pack")
+pockets.sam3(Frame) -> PocketResult        (POST /api/vision/fallback with POCKET_DETECTOR=sam3; Roboflow /sam3/concept_segment with the words "pill" and "blister pack")
 pockets.molmo(Frame) -> Point[]            (proposed; OpenRouter chat/completions, model allenai/molmo-2-8b:free; only while cloud assistance is on)
 pockets.agree(PocketResult, Point[]) -> PocketResult|null   (proposed; the same number inside the outline, or nothing)
 camera.check(Frame[]) -> GuidanceCue|null

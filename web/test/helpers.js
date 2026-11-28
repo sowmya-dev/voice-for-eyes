@@ -29,6 +29,7 @@ export function setup({ readings = [reading()], counts = null, cloud = null, clo
   let reading_ = null; // runs once, in the middle of the next camera read
   const speechLanguages = [];
   let captures = 0;
+  let countCalls = 0; // how often the strip model was asked
   const queue = [...readings];
   const countQueue = counts ? [...counts] : null;
   let loading = null; // sentences matching this never start playing
@@ -43,7 +44,7 @@ export function setup({ readings = [reading()], counts = null, cloud = null, clo
       const next = queue.length > 1 ? queue.shift() : queue[0];
       return next.reading ? next : { reading: next, quality: GOOD_QUALITY };
     },
-    countTablets: countQueue ? async () => (countQueue.length > 1 ? countQueue.shift() : countQueue[0]) : null,
+    countTablets: countQueue ? async () => { countCalls += 1; return countQueue.length > 1 ? countQueue.shift() : countQueue[0]; } : null,
     say: (text, lang, onStart) => {
       said.push({ text, lang, at: clock });
       if (loading && loading.test(text)) {
@@ -73,6 +74,7 @@ export function setup({ readings = [reading()], counts = null, cloud = null, clo
     assistant, said, views, dialled, cloudCalls, speechLanguages, screensAtRead,
     duringNextRead: (act) => { reading_ = act; },
     captures: () => captures,
+    countCalls: () => countCalls,
     advance: (ms) => { clock += ms; },
     duringNextWait: (act) => { waiting = act; },
     keepLoading: (pattern) => { loading = pattern; },

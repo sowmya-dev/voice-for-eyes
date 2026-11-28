@@ -5,6 +5,8 @@ Turns a trusted LabelReading and an Intent into a spoken answer. Depends on labe
 
 **As built (2026-11-28):** Intent names stay the eight in the spec; count, expiry and nutrition are an `aspect` of identify. A printed pack quantity is spoken as printed, never as the number left. With no strip model, a count question says it cannot count. Replies were first spoken only by the browser, which was silent for Telugu and Kannada on this laptop; decision 4 replaces that. Food labels read nutrition rows only; identifying a food pack without an "EXP" date goes to the unreadable steps. Two strips are not handled.
 
+**As built (2026-11-29):** The count is offered only when it is already remembered (decision 8). A silent count that is still running when the answer ends is waited for, and nothing is offered if the user has moved on by then.
+
 ## Design decisions
 All decisions are **Proposed**. None is agreed until we brainstorm this change.
 
@@ -46,7 +48,7 @@ All decisions are **Proposed**. None is agreed until we brainstorm this change.
 ### 8. Offer the count only when it is already known
 - **Status:** Agreed (user, 2026-11-29: "kick off dev, will take the 3 decisions later"), after the user reported on 2026-11-28 that the app still asks to show the strip again and again
 - **Plain English:** "Do you want to know how many tablets are left?" was offered whenever a strip model was set up, even when counting had just failed, and a "yes" then asked the user to show the strip. An offer must be something the app can answer on the spot, so the count is offered only when a count is already remembered.
-- **Pseudo-technical:** `available.count = typeof state.label?.count === 'number'` (today: a strip model is configured)
+- **Pseudo-technical:** `offerNext(): after 'all' and 'expiry', await state.label.counting if a silent count is running; stop if the turn is stale; offer 'count' only if typeof state.label.count === 'number'` (before: whenever a strip model was configured)
 
 ## High-level architecture flow
 ```text

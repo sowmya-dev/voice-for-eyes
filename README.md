@@ -20,7 +20,7 @@ Copy `.env.example` to `.env` and fill in what you have, then run `docker compos
 | `OPENROUTER_API_KEY` | Cloud help (also switch it on in Settings): surroundings and general questions | "I can't describe surroundings offline." |
 | `ROBOFLOW_PRIVATE_API_KEY` and `ROBOFLOW_MODEL_ID` | Tablet counting. `ROBOFLOW_MODEL_ID` may list several models, comma-separated, tried in order. Each needs classes for the strip, full pockets and empty pockets: named `medicine_strip`, `full_cavity`, `empty_cavity`, or renamed with `ROBOFLOW_CLASS_MAP` (e.g. `strip=medicine_strip,pill=full_cavity,missing=empty_cavity`). A model with only an empty-pocket class (such as `blister-strips-defect-detection/2` with `ROBOFLOW_CLASS_MAP=missing=empty_cavity`) gives the printed total read from the label minus the used pockets it sees | The app says it cannot count the tablets |
 | `GOOGLE_CLOUD_VISION_API_KEY` | Label reading with Google Cloud Vision: text in any direction and colour, from two camera frames (label photos go to Google) | Labels are read on the device with PaddleOCR |
-| `TEXT_READER`, `POCKET_DETECTOR` | Swap engines: `TEXT_READER=google` or `device`; `POCKET_DETECTOR=roboflow` or `none`. Each engine is an adapter in `backend/app/main.py` (`TEXT_READERS`, `POCKET_DETECTORS`) and `web/js/io/vision.js` | `google` when its key is set, else `device`; `roboflow` |
+| `TEXT_READER`, `POCKET_DETECTOR` | Swap engines: `TEXT_READER=google` or `device`; `POCKET_DETECTOR=roboflow`, `sam3` or `none`. `sam3` finds the strip and its pills by name with SAM 3 on Roboflow: it needs only `ROBOFLOW_PRIVATE_API_KEY`, no trained model, and works on any strip, but it is never the default (see Known limits). Each engine is an adapter in `backend/app/main.py` (`TEXT_READERS`, `POCKET_DETECTORS`) and `web/js/io/vision.js` | `google` when its key is set, else `device`; `roboflow` |
 
 **What goes to Sarvam:** while the microphone is on, audio streams all the time, and the text of every spoken reply (including a medicine name and any printed dosage) is sent to be turned into speech. Both use credits. **Mute mic** stops the audio stream. The server listens on all network interfaces on port 3000 and has no sign-in, so run it only on a network you trust.
 
@@ -39,7 +39,7 @@ camera -> 5 sharpest frames -> OpenCV cleanup (3 copies) -> PaddleOCR -> two cop
                                                    fallback: a voice on the device; otherwise a warning sound
 ```
 
-Camera frames are processed in the browser. A frame leaves the device only for cloud help (surroundings, when you turn it on) or the strip-counting fallback (only when a model is configured). After one visit, label reading also works offline.
+Camera frames are processed in the browser. A frame leaves the device only for cloud help (surroundings, when you turn it on) or the strip-counting fallback (only when a model is configured, or `POCKET_DETECTOR=sam3`). After one visit, label reading also works offline.
 
 - `web/js/core/`: conversation, safety, expiry, label and template logic (plain functions, fully tested)
 - `web/js/core/contract.js`: the data contract between the assistant and the screens
@@ -59,7 +59,8 @@ Camera frames are processed in the browser. A frame leaves the device only for c
 - Reading a label takes about 10 to 20 seconds in headless Chrome on a laptop, and each spoken reply then waits 1 to 4 seconds for its audio. The 108 sentence and the risk question are fetched in advance.
 - Offline, or without a Sarvam key, a language with no voice on the device (Telugu or Kannada on a typical Windows laptop) is shown on screen with a warning sound, not spoken.
 - Tablet strengths in the Sarvam voice were checked only by machine transcription, not by native listeners. One Telugu "500" out of about 28 Telugu checks came back garbled. The screen always shows the label text.
-- Tablet counting needs a trained strip model, which does not exist yet.
+- Tablet counting is limited. The configured Roboflow model sees only used pockets, so the app says the printed pack size minus the used pockets it sees; it cannot count a full strip, or a strip whose pack size is not printed. It asks to see the strip at most once per strip, then says it cannot count.
+- `POCKET_DETECTOR=sam3` counts the pills it can see on any strip. On 10 hand-counted strips with clear pockets it was exact on 8, gave no count on 1 and was wrong on 1 (it took 5 torn-open pockets for tablets and would have said 10 for 5). Nothing checks its number yet, so switch it on only to try it out. It has not been run through the app.
 - Not built: cut-strip detection, two strips at once, on-device speech detection and language identification, languages beyond four.
 - Hindi, Telugu and Kannada wording is not reviewed by native speakers. The ingredient table needs a pharmacist's review.
 - The phone dialer for 108 has not been tried on a real phone, and a web page cannot place a call by itself.

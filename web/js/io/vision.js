@@ -115,9 +115,10 @@ export async function readCloud(frames, used, post, encode = (frame) => toJpeg({
 
 // Two of the sharpest frames must agree: on the full pockets of a whole strip (count), or on the number of
 // used, empty pockets (empty) for a model that cannot see full ones. No empty pocket is not reported:
-// it cannot be told apart from no strip in view.
+// it cannot be told apart from no strip in view. `strips` is the most strip outlines either frame showed
+// (0 from a detector that outlines none), so the app can ask to see just one.
 export async function countFrames(frames, used, post) {
-  if (used.length < 2) return { count: null, empty: null };
+  if (used.length < 2) return { count: null, empty: null, strips: 0 };
   const size = { width: frames[0].width, height: frames[0].height };
   const found = [];
   for (const index of used.slice(0, 2)) found.push(await post(frames[index]));
@@ -126,6 +127,7 @@ export async function countFrames(frames, used, post) {
   return {
     count: counts[0] !== null && counts[0] === counts[1] ? counts[0] : null,
     empty: empties[0] > 0 && empties[0] === empties[1] ? empties[0] : null,
+    strips: Math.max(0, ...found.map((f) => f?.strips ?? 0)),
   };
 }
 

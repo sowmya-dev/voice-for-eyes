@@ -3,7 +3,9 @@
 ## Context
 Decides what happens when speech or the label cannot be understood. Works with voice-interaction, label-image-processing and safety-rules. See [`proposal.md`](proposal.md) for the motivation.
 
-**As built (2026-11-28):** When no single direction can be worked out (nothing is cut off), the app says what it cannot read and asks to flip or turn the strip; it does not invent a direction, so the exact sentence is not used and task 1.5 stays open. Cut strips are not detected. Counting retries run only when a strip model is configured. Camera limits in `web/js/core/guidance.js` are untuned.
+**As built (2026-11-28):** When no single direction can be worked out (nothing is cut off), the app says what it cannot read and asks to flip or turn the strip; it does not invent a direction, so the exact sentence is not used and task 1.5 stays open. Cut strips are not detected. Counting requests are made only when a strip model is configured. Camera limits in `web/js/core/guidance.js` are untuned.
+
+**As built (2026-11-29):** One request per strip in a session (decision 9): the entire strip, just one strip, or the printed side. "Just one strip" needs a detector that outlines strips, which today is only `sam3`; the default Roboflow model outlines none, so with it that request is never made. The request screen has its own heading for each of the three and shows no note, attempt counter or photo button.
 
 ## Design decisions
 All decisions are **Proposed**. None is agreed until we brainstorm this change.
@@ -51,7 +53,7 @@ All decisions are **Proposed**. None is agreed until we brainstorm this change.
 ### 9. One request per strip, not per question
 - **Status:** Agreed (user, 2026-11-29: "kick off dev, will take the 3 decisions later"), after the user reported on 2026-11-28 that the app still asks to show the strip again and again
 - **Plain English:** Three things still brought the request back. The app offered to count after almost every answer although it could not (medicine-label-reading, decision 8); a "yes" then asked the user to show the strip; and every repeated count question asked again. The request is now made at most once for a strip in a session. Asked again, the app takes another look without asking and says honestly what it sees. With more than one strip in view it asks, once, to see just one.
-- **Pseudo-technical:** `entry.countAsked = true after the first request for this strip; count(): result = countOnce(); if !counted and !entry.countAsked: ask once (show_strip | one_strip | show_print), look again; then answer (count | used_only | give_up) with no further request`
+- **Pseudo-technical:** `entry.countAsked = true after the first request for this strip; count(): result = countOnce(); if !counted and !entry.countAsked: ask once (show_strip | one_strip | show_print), look again; then answer (count | several | used_only | give_up) with no further request`
 
 ## High-level architecture flow
 ```text

@@ -3,7 +3,7 @@
 /ws/stt              relays microphone audio to Sarvam realtime speech-to-text
 /api/tts             speaks a reply with Sarvam text-to-speech
 /api/cloud           surroundings and general questions through OpenRouter free models
-/api/vision/fallback strip detection on Roboflow, only when a model id is configured
+/api/vision/fallback strip detection on Roboflow: a trained model when its id is configured, or SAM 3 when chosen
 """
 import asyncio
 import base64
@@ -365,6 +365,70 @@ async def detect_strip(image: str) -> dict:
     return result
 
 
+# ---------- pills found by name: SAM 3 on Roboflow ----------
+SAM3_WORDS = ("pill", "blister pack")
+# Measured on 12 hand-counted photos: used pockets and false marks scored at most 0.68, real pills at least 0.76.
+SAM3_BAR = 0.7
+
+
+def sam3_segment(image: str) -> dict:
+    from inference_sdk import InferenceHTTPClient  # imported on first use: it is large
+
+    client = InferenceHTTPClient(api_url=env("ROBOFLOW_API_URL", "https://serverless.roboflow.com"),
+                                 api_key=env("ROBOFLOW_PRIVATE_API_KEY"))
+    return client.sam3_concept_segment(image, prompts=[{"type": "text", "text": word} for word in SAM3_WORDS])
+
+
+def polygons_of(prediction: dict) -> list:
+    """The outline of one SAM 3 prediction: one or more polygons, each a list of [x, y]."""
+    return [polygon for polygon in prediction.get("masks") or [] if len(polygon) >= 3]
+
+
+def inside(point: tuple, polygon: list) -> bool:
+    """Ray casting: is the point inside the polygon itself, not just its bounding box?"""
+    x, y = point
+    hit = False
+    for (x1, y1), (x2, y2) in zip(polygon, polygon[1:] + polygon[:1]):
+        if (y1 > y) != (y2 > y) and x < (x2 - x1) * (y - y1) / (y2 - y1) + x1:
+            hit = not hit
+    return hit
+
+
+def box_of(polygons: list) -> dict:
+    xs = [point[0] for polygon in polygons for point in polygon]
+    ys = [point[1] for polygon in polygons for point in polygon]
+    return {"x": min(xs), "y": min(ys), "w": max(xs) - min(xs), "h": max(ys) - min(ys)}
+
+
+def sam3_result(reply: dict) -> dict:
+    """SAM 3's outlines as the result every pocket detector gives, plus how many strips it outlined.
+    A pill counts only inside the one strip outline and at SAM3_BAR or more, so loose pills, pills printed
+    on a box and used pockets are left out. With no strip outline, or more than one, nothing is counted."""
+    found: dict = {}
+    for position, result in enumerate(reply.get("prompt_results") or []):
+        index = result.get("prompt_index", position)
+        word = (result.get("echo") or {}).get("text") or (SAM3_WORDS[index] if 0 <= index < len(SAM3_WORDS) else None)
+        found[word] = result.get("predictions") or []
+    strips = [polygons_of(strip) for strip in found.get("blister pack", []) if polygons_of(strip)]
+    if len(strips) != 1:
+        return {"strip": None, "full": [], "empty": [], "strips": len(strips)}
+    full = []
+    for pill in found.get("pill", []):
+        shape = polygons_of(pill)
+        if not shape or pill.get("confidence", 0) < SAM3_BAR:
+            continue
+        box = box_of(shape)
+        centre = (box["x"] + box["w"] / 2, box["y"] + box["h"] / 2)
+        if any(inside(centre, polygon) for polygon in strips[0]):
+            full.append(box)
+    return {"strip": box_of(strips[0]), "full": full, "empty": [], "strips": 1}
+
+
+async def detect_with_sam3(image: str) -> dict:
+    """Pocket detector adapter: a base64 JPEG in, the common result out. Works on any strip, with no trained model."""
+    return sam3_result(await run_in_threadpool(sam3_segment, image))
+
+
 @app.post("/api/vision/fallback")
 async def vision_fallback(request: ImageRequest):
     name = pocket_detector()
@@ -383,7 +447,11 @@ async def vision_fallback(request: ImageRequest):
 
 # The engines each job can use. A new engine is one more adapter here, chosen with its setting.
 TEXT_READERS = {"google": Engine(lambda: None if env("GOOGLE_CLOUD_VISION_API_KEY") else "key_not_set", read_with_google)}
-POCKET_DETECTORS = {"roboflow": Engine(roboflow_problem, detect_strip)}
+POCKET_DETECTORS = {
+    "roboflow": Engine(roboflow_problem, detect_strip),
+    # Chosen with POCKET_DETECTOR=sam3, never the default: alone it was wrong on 1 of 10 strips (see test_sam3.py).
+    "sam3": Engine(lambda: None if env("ROBOFLOW_PRIVATE_API_KEY") else "key_not_set", detect_with_sam3),
+}
 
 
 # ---------- speech relay ----------

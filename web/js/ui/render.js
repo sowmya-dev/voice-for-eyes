@@ -36,6 +36,11 @@ export function h(tag, attributes = {}, ...children) {
 
 const fill = (text, values) => text.replace(/\{(\w+)\}/g, (_, key) => String(values[key] ?? ''));
 
+// A request made while counting (the entire strip, just one strip, or the printed side) has its own heading
+// and none of the label-reading extras. Null for every other cue.
+const COUNT_REQUEST_TITLES = { show_strip: 'stripTitle', one_strip: 'oneStripTitle', show_print: 'printTitle' };
+export const countRequestTitle = (view, t) => t[COUNT_REQUEST_TITLES[view.cue]] ?? null;
+
 export function createRenderer({ onAction }) {
   const $ = (id) => document.getElementById(id);
   const button = (key, label, variant = 'secondary', extra = {}) => h('button', { type: 'button', class: `btn ${variant}`, 'data-key': key, onclick: () => onAction(key), ...extra }, label);
@@ -128,9 +133,9 @@ export function createRenderer({ onAction }) {
     3: answerScreen,
     4: warningScreen,
     5: (view, ui, t) => [
-      h('h1', {}, view.cue === 'show_strip' ? t.stripTitle : t.cantReadTitle),
+      h('h1', {}, countRequestTitle(view, t) ?? t.cantReadTitle),
       card(said(view)),
-      view.cue === 'show_strip' ? null : h('div', { class: 'card note' }, t.cleanNote),
+      countRequestTitle(view, t) ? null : h('div', { class: 'card note' }, t.cleanNote),
       retryButtons(view, t),
     ],
     '5b': (view, ui, t) => [
@@ -150,7 +155,7 @@ export function createRenderer({ onAction }) {
   };
 
   function retryButtons(view, t) {
-    if (view.final || view.cue === 'show_strip') return null;
+    if (view.final || countRequestTitle(view, t)) return null;
     return h('div', { class: 'row' }, button('take_photo', t.takePhoto, 'primary big'), button('later', t.comeBackLater, 'secondary big'));
   }
 

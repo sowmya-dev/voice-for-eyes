@@ -16,7 +16,6 @@ const CLEAN_KNOWN_MS = 17000; // longer once the name or expiry is read: the str
 const MOVE_WAIT_MS = 3000; // time to move the medicine before the next read
 const RISK_WAIT_MS = 8000; // silence after the risk question
 const MAX_ATTEMPTS = 3;
-const COUNT_REQUESTS = 1; // asking again rarely helps a model that only sees used pockets
 const MEMORY_SIZE = 20;
 const DIRECTIONS = ['left', 'right', 'up', 'down'];
 const TASK_SCREENS = ['reading', '2', '3', '4', '5', '5b', '5c'];
@@ -202,7 +201,7 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
       const known = remembered();
       const reading = mergeReading(known?.reading, result.reading);
       if (known && reading !== result.reading) Object.assign(known, { reading, at: ports.now() });
-      else state.label = { reading, at: ports.now(), count: undefined, counting: null };
+      else state.label = { reading, at: ports.now(), count: undefined, counting: null, countTried: false, countAsked: false };
       if (reading.labelId) state.lastLabel = reading;
       ports.log({ stage: 'label', durationMs: ports.now() - started, outcome: 'ok', turnId: state.turn });
       return { ...result, reading };
@@ -304,22 +303,33 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
   }
 
   // After a plain answer, offer the next thing not yet told: what it is, the expiry, then the count.
+  // Only what can be answered on the spot is offered. A count is offered when it is already known, never
+  // because a strip model happens to be set up: that offer led to "Please show me the entire strip".
   async function offerNext(label, turn) {
     const verdict = state.lastVerdict;
-    if (stale(turn) || state.risk || state.task || !verdict || verdict.expired === true || verdict.requiresConfirmation) return;
-    const canCount = Boolean(ports.countTablets) || typeof state.label?.count === 'number';
-    const available = { all: Boolean(label?.name), expiry: Boolean(label?.expiry), count: canCount };
-    const next = ['all', 'expiry', 'count'].find((aspect) => available[aspect] && !state.told.has(aspect));
+    const blocked = () => stale(turn) || state.risk || state.task;
+    if (blocked() || !verdict || verdict.expired === true || verdict.requiresConfirmation) return;
+    const available = { all: Boolean(label?.name), expiry: Boolean(label?.expiry) };
+    let next = ['all', 'expiry'].find((aspect) => available[aspect] && !state.told.has(aspect));
+    if (!next && !state.told.has('count')) {
+      // The offer follows the spoken answer, so a silent count that is still running is worth waiting for.
+      if (state.label?.counting) await state.label.counting;
+      if (blocked()) return;
+      if (typeof state.label?.count === 'number') next = 'count';
+    }
     if (!next) return;
     state.offer = { aspect: next, friendly: true };
     update({ spoken: `${state.view.spoken} ${renderSegments([seg(`confirm.${next}`)], state.lang)}` });
     await speak([seg(`confirm.${next}`)]);
   }
 
-  // Once the label is complete, the tablets are counted once without making the user wait.
+  // Once the label is complete, the tablets are counted without making the user wait: once per strip.
+  // Counting again after every answer found nothing new and spent two strip-model calls each time.
+  // It runs again only after "I took one", or for a different strip (a new entry).
   function countInBackground() {
     const entry = remembered();
-    if (!ports.countTablets || !entry || entry.count !== undefined || entry.counting) return;
+    if (!ports.countTablets || !entry || entry.count !== undefined || entry.counting || entry.countTried) return;
+    entry.countTried = true;
     entry.counting = ports.countTablets()
       .then((result) => {
         const counted = countFrom(result, entry.reading);
@@ -468,12 +478,17 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
     if (stale(turn)) return;
     let result = await countOnce();
     let counted = countFrom(result, labelNow(label));
-    // With no counter available, asking the user to move the strip cannot help.
-    for (let asked = 0; !counted && ports.countTablets && asked < COUNT_REQUESTS; asked += 1) {
+    // One request for a strip in a session. Asked again about the same strip, the app has just looked again
+    // and answers honestly with no request. With no counter available, asking cannot help at all.
+    if (!counted && ports.countTablets && !state.label?.countAsked) {
+      if (state.label) state.label.countAsked = true;
+      const several = result?.strips > 1;
       // Used cells are seen but not how many the strip holds: read the printed side, then work it out.
-      const needTotal = result?.empty != null && !labelNow(label).packCount;
-      const cue = needTotal ? [seg('count.need_total', { empty: result.empty })] : [seg('count.show_strip')];
-      await prompt(cue, { screen: '5', tone: 'blur', asked: ctx.asked, cue: needTotal ? 'show_print' : 'show_strip', attempt: asked + 1 });
+      const needTotal = !several && result?.empty != null && !labelNow(label).packCount;
+      const request = several ? { cue: 'one_strip', segments: [seg('count.one_strip')] }
+        : needTotal ? { cue: 'show_print', segments: [seg('count.need_total', { empty: result.empty })] }
+          : { cue: 'show_strip', segments: [seg('count.show_strip')] };
+      await prompt(request.segments, { screen: '5', tone: 'blur', asked: ctx.asked, cue: request.cue });
       if (stale(turn)) return;
       await ports.sleep(MOVE_WAIT_MS);
       if (stale(turn)) return;
@@ -485,10 +500,12 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
     if (stale(turn)) return;
     const seen = counted?.n ?? null;
     if (counted && state.label) Object.assign(state.label, { count: counted.n, countSegments: counted.segments });
-    const segments = counted ? counted.segments : [result?.empty != null ? seg('count.used_only', { empty: result.empty }) : seg('count.give_up')];
+    const failed = result?.strips > 1 ? seg('count.several')
+      : result?.empty != null ? seg('count.used_only', { empty: result.empty }) : seg('count.give_up');
+    const segments = counted ? counted.segments : [failed];
     await deliver({ intent: 'identify', aspect: 'count', medicine: true, segments }, labelNow(label), turn, { ...ctx, count: seen });
     if (seen !== null) await offerNext(labelNow(label), turn);
-    else if (!stale(turn)) show({ screen: '1' }, { remember: false }); // no count after the one request: back to the start
+    else if (!stale(turn)) show({ screen: '1' }, { remember: false }); // no count: back to the start
   }
 
   // ---------- safety events ----------
@@ -524,7 +541,7 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
     if (intent.aspect === 'unwell') return urgent('unwell', [seg('help.unwell')], turn, ctx);
     const plan = (segments, medicineAnswer = true) => ({ intent: 'safety', aspect: intent.aspect, medicine: medicineAnswer, segments });
     if (intent.aspect === 'which_take') return deliver(plan([seg('rec.none')], false), null, turn, ctx);
-    if (['took', 'took_more'].includes(intent.aspect) && state.label) Object.assign(state.label, { count: undefined, countSegments: undefined }); // the strip has changed
+    if (['took', 'took_more'].includes(intent.aspect) && state.label) Object.assign(state.label, { count: undefined, countSegments: undefined, countTried: false }); // the strip has changed
     look(ctx.asked);
     const { reading: label } = await capture();
     if (stale(turn)) return;

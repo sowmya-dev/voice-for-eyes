@@ -5,6 +5,8 @@ Last stage of the pipeline. See [`proposal.md`](proposal.md) for the motivation.
 
 **As built (2026-11-28):** Only identification, expiry and dosage answers are replayed. Count and safety-event answers are worked out again, because replaying an old count or symptom reply could be wrong; task 1.2 stays open until that is agreed.
 
+**As built (2026-11-29):** The silent count runs once per strip (decision 6). A count question always looks again itself, whatever the silent count found.
+
 ## Design decisions
 All decisions are **Proposed**. None is agreed until we brainstorm this change.
 
@@ -36,7 +38,7 @@ All decisions are **Proposed**. None is agreed until we brainstorm this change.
 ### 6. One background count per strip
 - **Status:** Agreed (user, 2026-11-29: "kick off dev, will take the 3 decisions later"), after the user reported on 2026-11-28 that the app still asks to show the strip again and again
 - **Plain English:** The silent count after a label is read was repeated after every answer for as long as it found nothing. That spent two strip-model calls each time and achieved nothing. It is tried once per strip; a new try needs a reason: the user took a tablet, asks for the count, or shows a different strip.
-- **Pseudo-technical:** `entry.countTried = true on the first background count; countInBackground() returns at once when entry.countTried; cleared on 'took', on a count question, and when mergeReading starts a new strip`
+- **Pseudo-technical:** `entry.countTried = true on the first background count; countInBackground() returns at once when entry.countTried; cleared on 'took', and a different strip is a new entry with the flag unset; a count question counts in the foreground whatever the flag says`
 
 ## High-level architecture flow
 ```text

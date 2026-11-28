@@ -3,18 +3,25 @@
 ## Context
 Decides what happens when speech or the label cannot be understood. Works with voice-interaction, label-image-processing and safety-rules. See [`proposal.md`](proposal.md) for the motivation.
 
+**As built (2026-11-28):** When no single direction can be worked out (nothing is cut off), the app says what it cannot read and asks to flip or turn the strip; it does not invent a direction, so the exact sentence is not used and task 1.5 stays open. Cut strips are not detected. Counting retries run only when a strip model is configured. Camera limits in `web/js/core/guidance.js` are untuned.
+
 ## Design decisions
 All decisions are **Proposed**. None is agreed until we brainstorm this change.
 
 ### 1. Recovery is a small state machine
 - **Status:** Proposed
 - **Plain English:** The app remembers which step it is on, so it never loops on the same question.
-- **Pseudo-technical:** `speechStep: crossCheck -> askRepeat -> readLabel; intentStep: reask -> readLabel -> clearerView; reset after any understood turn`
+- **Pseudo-technical:** `speechStep: crossCheck -> repeatOrQuieter -> readLabel + confirmRequest -> repeatQuestion; intentStep: reask -> readLabel -> clearerView; reset after any understood turn`
 
 ### 2. Cross-check before asking
 - **Status:** Proposed
 - **Plain English:** If words on the label explain the unclear speech, the app does not ask again.
-- **Pseudo-technical:** `if confidence < T and match(transcript, label.lines): accept the label word`
+- **Pseudo-technical:** `if unclear(final) and match(transcript, label.lines): accept the label word`
+
+### 4. Unclear speech without a confidence score
+- **Status:** Agreed (user, 2026-11-28)
+- **Plain English:** Sarvam gives no confidence score for the words, so the app treats a transcript as unclear when it is empty, matches no request, or names a different medicine from the label.
+- **Pseudo-technical:** `unclear(final) = final.text.trim() == '' or intent == 'unknown' or (spokenName and spokenName != label.name)`
 
 ### 3. Cleaning has a time budget
 - **Status:** Proposed
@@ -23,7 +30,7 @@ All decisions are **Proposed**. None is agreed until we brainstorm this change.
 
 ## High-level architecture flow
 ```text
-low confidence -> cross-check with camera text -> "Did I hear X? Say again?" -> read label
+doubtful speech -> cross-check with camera text -> repeat or move somewhere quieter -> read label + confirm likely request -> repeat the question
 unknown intent -> ask again -> read label -> request clearer view
 unreadable label -> clean for 5s -> say what is readable -> exact "I can't read this..." sentence
 ```
@@ -39,7 +46,7 @@ unreadable label -> clean for 5s -> say what is readable -> exact "I can't read 
 Proposed. A type used by several changes is defined once, in the change that owns it.
 
 ```text
-RecoveryState = { speechStep: 0|1|2, intentStep: 0|1|2, heard: string|null, cleaningStartedAt: ms|null }
+RecoveryState = { speechStep: 0|1|2|3, likelyIntent: Intent.name|null, intentStep: 0|1|2, heard: string|null, cleaningStartedAt: ms|null }
 CrossCheck    = { transcript: string, matchedLabelText: string|null, resolved: bool }
 ```
 
@@ -53,7 +60,10 @@ recovery.next(RecoveryState, event) -> { state: RecoveryState, plan: ResponsePla
 unclear turn -> cross-check -> if unresolved take the next step -> after a clarification begin with "You said: X" -> reset on success.
 
 ## Open decisions
-- R10: the "low-confidence" threshold has no value. Recommendation: set it from test recordings.
+- How the one direction is worked out. Proposed: from where text is cut off at a frame edge or covered by glare, converted to the user's view for the camera in use. Needs tests with real strips.
+- What to say when no direction can be worked out. Recommendation: do not invent one; ask the user to hold the strip flat in the middle of the view, and count it as a retry. This departs from the exact sentence, so it needs agreement.
+- What happens if the repeated question is also unclear. Recommendation: wait for speech without replaying the label.
+- R10: no transcript confidence threshold is needed; decision 4 replaces it.
 - R11: whether the exact unreadable sentence is translated. Recommendation: use reviewed translations.
 
 ## Risks

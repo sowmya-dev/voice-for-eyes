@@ -3,6 +3,8 @@
 ## Context
 This change owns the session and the order of the pipeline. Other changes plug stages into it. `web/index.html` today only starts a camera preview from a button. See [`proposal.md`](proposal.md) for the motivation.
 
+**As built (2026-11-28):** Utterance boundaries come from Sarvam's voice detection. `web/js/core/assistant.js` is the one pipeline; every answer passes `safety.evaluate` before it is spoken. The contract between the assistant and the screens is the `View` in `web/js/core/contract.js` (screen, spoken text, label tiles, risk, retry attempt, direction, dial); screens render only from it and tests check every view against it. Replies the microphone hears from the speaker are dropped by a word-overlap echo guard. Since 2026-11-28 replies are Sarvam audio, which fades out on interruption; the browser-voice fallback can only stop at once. Interrupting with real speaker sound reaching the microphone is untested, so task 1.3 stays open. Task 1.5 needs a screen-reader test.
+
 ## Design decisions
 All decisions are **Proposed**. None is agreed until we brainstorm this change.
 

@@ -14,7 +14,7 @@ Cloud assistance SHALL be optional, disabled by default and controlled by a togg
 
 #### Scenario: Toggle on
 - **WHEN** the user enables the toggle
-- **THEN** cloud assistance is used through LiteLLM
+- **THEN** cloud assistance is used through OpenRouter, called by the app server
 
 ### Requirement: Missing cloud key
 When no cloud key is configured, the app SHALL show a "key not set" message for cloud assistance and keep all other features working. Keys SHALL NOT be sent to the browser.

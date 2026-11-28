@@ -5,7 +5,7 @@ The app must run for the judges with one command, work on basic phones and keep 
 
 ## What Changes
 - Web client served by Docker on port 3000, without keys.
-- On-device speech and OCR, offline use, local logging and performance checks.
+- Speech-to-text through Sarvam; on-device speech detection, language identification and OCR; offline label reading, local logging and performance checks.
 
 ## Capabilities
 

@@ -19,6 +19,10 @@ The app SHALL start with one `docker compose` command and show its main screen o
 - **WHEN** the app is started from a fresh copy of the project with no keys and no `.env` file
 - **THEN** the main screen is shown on port 3000
 
+#### Scenario: No speech key
+- **WHEN** the app runs without a Sarvam key
+- **THEN** the main screen states that voice input is unavailable
+
 ### Requirement: Secure connection for capture
 When the browser blocks the camera or microphone, including on a connection that is neither HTTPS nor localhost, the app SHALL still show its main screen and state why capture is unavailable.
 
@@ -27,29 +31,45 @@ When the browser blocks the camera or microphone, including on a connection that
 - **THEN** the main screen explains that HTTPS or localhost is needed
 
 ### Requirement: Local-first and offline-capable
-The system SHALL process data in the user's browser by default, not on the app server, and SHALL be able to read medicine labels offline once the app and its models have loaded.
+The system SHALL process images and read medicine labels in the user's browser. Speech audio SHALL be sent to Sarvam for transcription, and reply text to be spoken. A camera frame SHALL leave the device only for the Roboflow strip-detection fallback. Once loaded, label reading SHALL NOT need a network; voice input does.
 
 #### Scenario: No network
-- **WHEN** the app and its models have loaded, the network is lost, and the user asks to identify a medicine
-- **THEN** the question is answered on the device
+- **WHEN** the app and its models have loaded and the network is lost
+- **THEN** label reading can still run on the device, the system states that voice input is unavailable, and replies use only a voice on the device
 
 #### Scenario: Default processing
 - **WHEN** cloud assistance is off
-- **THEN** no audio, image or transcript leaves the device
+- **THEN** only speech audio and reply text go to Sarvam through the app server, and no image leaves the device unless the strip-detection fallback is used
+
+#### Scenario: Detection fallback
+- **WHEN** the in-browser strip model gives no result
+- **THEN** only the camera frame needed is sent through the app server to Roboflow, and the medicine name and expiry are still read on the device
 
 ### Requirement: On-device speech stack
-The system SHALL run voice activity detection (Silero VAD), language identification (Whisper small, or base if needed for latency) and speech-to-text on the device in the browser through sherpa-onnx.
+The system SHALL run voice activity detection (Silero VAD) and language identification (Whisper small, or base if needed for latency) on the device in the browser through sherpa-onnx.
 
 #### Scenario: Offline speech
 - **WHEN** the device is offline
-- **THEN** speech is detected, identified and transcribed on the device
+- **THEN** speech is detected and its language identified on the device
 
-### Requirement: Speech-to-text fallback order
-Speech-to-text SHALL use AI4Bharat IndicConformer, falling back to Shruti-ONNX and then Meta Omnilingual ASR 300M.
+### Requirement: Speech-to-text through Sarvam
+Speech-to-text for English, Hindi, Telugu and Kannada SHALL use Sarvam's realtime streaming service, through Sarvam's Python package `sarvamai` on the app server, with model saaras:v4 and mode codemix, following the contract in the design. The Sarvam key SHALL stay on the app server and SHALL NOT reach the browser.
 
-#### Scenario: Primary model cannot be used
-- **WHEN** the primary model cannot serve a language
-- **THEN** the next model in the order is used
+#### Scenario: Stream accepted
+- **WHEN** a speech stream is opened and Sarvam answers with status 101
+- **THEN** audio is streamed at the configured sample rate with model saaras:v4 and mode codemix
+
+#### Scenario: Language code
+- **WHEN** a stream is opened for these languages
+- **THEN** its language_code is en-IN, hi-IN, te-IN, kn-IN or auto
+
+#### Scenario: Key not exposed
+- **WHEN** the browser's files and network traffic are inspected
+- **THEN** the Sarvam key does not appear
+
+#### Scenario: Stream refused
+- **WHEN** the stream cannot be opened
+- **THEN** the system states that voice input is unavailable
 
 ### Requirement: On-device OCR
 OCR SHALL run in the browser on the user's device with PaddleOCR PP-OCRv5 Mobile.

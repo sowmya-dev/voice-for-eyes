@@ -1,0 +1,5 @@
+# Keys must never be copied into an image.
+.env
+.env.*
+**/__pycache__
+tests

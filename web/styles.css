@@ -1,0 +1,126 @@
+/* Layout and components from docs/design/voai. Every colour comes from tokens.css. */
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; background: var(--bg); color: var(--ink); font-family: var(--font-latin); overflow-wrap: anywhere; line-height: 1.35; }
+:lang(hi) { font-family: 'Noto Sans Devanagari', var(--font-latin); }
+:lang(te) { font-family: 'Noto Sans Telugu', var(--font-latin); }
+:lang(kn) { font-family: 'Noto Sans Kannada', var(--font-latin); }
+body:lang(hi), body:lang(te), body:lang(kn) { line-height: 1.4; }
+button { font-family: inherit; cursor: pointer; }
+:focus-visible { outline: 4px solid var(--ink); outline-offset: 3px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+#header { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; padding: 20px var(--space-page); }
+body:not([data-screen="1"]):not([data-screen="1b"]):not([data-screen="5d"]) #header { border-bottom: 2px solid var(--hairline); }
+.wordmark { font-size: 28px; font-weight: 700; letter-spacing: 0.02em; }
+.wordmark-sub { font-size: 18px; font-weight: 400; color: var(--muted); }
+.pill { min-height: 48px; padding: 0 20px; border-radius: var(--radius-lg); border: 2px solid var(--accent); background: var(--surface); color: var(--accent); font-size: 18px; font-weight: 700; }
+.title-row { display: flex; align-items: center; gap: 16px; }
+.title-row h1 { font-size: 32px; }
+.back-button { width: 56px; height: 56px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: var(--surface); color: var(--ink); }
+
+#main { flex: 1; width: 100%; margin: 0 auto; }
+#main.panes { display: flex; flex-wrap: wrap; gap: 32px; padding: 32px var(--space-page); max-width: 1440px; }
+#main.home #assistant { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 40px; padding: 24px; min-height: 60vh; }
+#main.settings #assistant { display: flex; flex-wrap: wrap; gap: 32px; align-content: flex-start; padding: 32px var(--space-page); max-width: 1200px; margin: 0 auto; }
+#main.panes #assistant { flex: 1 1 380px; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
+
+/* The video must keep playing on screens that hide the camera, so it moves off screen instead of display:none. */
+#camera { position: relative; background: var(--camera); border: 2px solid var(--hairline); border-radius: var(--radius-lg); overflow: hidden; display: flex; align-items: center; justify-content: center; }
+#main.panes #camera { flex: 999 1 560px; min-width: 0; min-height: 480px; }
+#main.home #camera, #main.settings #camera { position: absolute; left: -10000px; width: 320px; height: 240px; visibility: hidden; }
+#camera.warn { border: 4px solid var(--warn); }
+#camera.warn #chip { color: var(--warn); }
+#video { width: 100%; height: 100%; object-fit: contain; position: absolute; inset: 0; }
+#chip { position: absolute; left: 16px; top: 16px; max-width: calc(100% - 32px); background: var(--surface); border-radius: var(--radius-md); padding: 8px 16px; font-size: 18px; font-weight: 700; color: var(--accent); }
+#controls { position: absolute; left: 16px; right: 16px; bottom: 16px; display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+.arrow { position: absolute; color: var(--accent); background: var(--surface); border-radius: 50%; padding: 6px; }
+.arrow-up { top: 72px; left: calc(50% - 28px); }
+.arrow-down { bottom: 96px; left: calc(50% - 28px); }
+.arrow-left { left: 20px; top: calc(50% - 28px); }
+.arrow-right { right: 20px; top: calc(50% - 28px); }
+.frame { position: absolute; inset: 16px; border: 3px dashed var(--accent); border-radius: 18px; pointer-events: none; }
+.countdown { position: absolute; top: calc(50% - 60px); left: calc(50% - 60px); width: 120px; height: 120px; border-radius: 60px; background: var(--surface); border: 6px solid var(--accent); display: flex; align-items: center; justify-content: center; font-size: 64px; font-weight: 700; color: var(--accent); }
+
+h1 { margin: 0; font-size: 36px; line-height: 1.15; }
+.card { background: var(--surface); border: 2px solid var(--border); border-radius: var(--radius-md); padding: 20px 24px; display: flex; flex-direction: column; gap: 12px; }
+.card.soft { background: var(--accent-soft); border-color: var(--accent); max-width: 560px; }
+.card.centred { text-align: center; }
+.caps { font-size: 16px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.spoken { font-size: 30px; line-height: 1.3; font-weight: 700; }
+.lead { font-size: 26px; font-weight: 700; line-height: 1.3; }
+.sub { font-size: 22px; color: var(--muted); }
+.asked { font-size: 20px; color: var(--muted); }
+.note { font-size: 18px; color: var(--muted); }
+.small { font-size: 18px; color: var(--muted); }
+.status { font-size: 24px; color: var(--muted); text-align: center; }
+.notice { width: 100%; max-width: 560px; background: var(--warn-bg); border: 2px solid var(--warn); border-radius: var(--radius-sm); padding: 12px 16px; font-size: 18px; color: var(--ink); }
+
+.tiles { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.tile { background: var(--surface); border: 2px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; }
+.tile.highlight { background: var(--accent-soft); border-color: var(--accent); }
+.tile dt { font-size: 16px; font-weight: 700; color: var(--muted); }
+.tile.highlight dt { color: var(--accent); }
+.tile dd { margin: 2px 0 0; font-size: 24px; }
+.tile-detail { display: block; font-size: 18px; color: var(--muted); }
+
+.row { display: flex; flex-wrap: wrap; gap: 12px; }
+.row.narrow { width: 100%; max-width: 560px; }
+.btn { min-height: var(--touch-min); padding: 8px 16px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: var(--surface); color: var(--ink); font-size: 20px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 10px; text-decoration: none; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.btn.outline { border-color: var(--accent); color: var(--accent); }
+.btn.big { flex: 1 1 160px; min-height: 64px; font-size: 22px; }
+.btn.square { width: 64px; min-height: 64px; font-size: 32px; flex: none; }
+.btn.small-button { font-size: 18px; }
+.btn.call { font-size: 26px; min-height: 80px; flex: none; }
+
+.risk { border-color: var(--accent); margin-top: auto; }
+.risk-question { font-size: 28px; font-weight: 700; }
+.alert { background: var(--warn-bg); border: 4px solid var(--warn); border-radius: var(--radius-md); padding: 24px; display: flex; flex-direction: column; gap: 14px; }
+.alert-label { display: flex; align-items: center; gap: 12px; color: var(--warn); font-size: 20px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.alert-text { font-size: 32px; line-height: 1.25; font-weight: 700; }
+
+.mic-button { width: 260px; height: 260px; border-radius: 130px; border: 0; background: var(--accent); color: var(--surface); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 18px var(--accent-soft), 0 0 0 36px var(--bg), 0 0 0 38px var(--accent-ring); flex: none; }
+.mic-button:focus-visible { outline-offset: 44px; }
+
+.waveform { flex-direction: row; align-items: center; justify-content: center; gap: 8px; height: 112px; }
+.waveform span { width: 10px; border-radius: 5px; background: var(--accent); }
+.steps { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; font-size: 20px; }
+.steps li { display: flex; gap: 12px; align-items: center; color: var(--muted); }
+.steps li.done { color: var(--ink); }
+.step-number { width: 36px; height: 36px; border-radius: 18px; border: 2px solid var(--border); font-weight: 700; display: flex; align-items: center; justify-content: center; flex: none; }
+.steps li.done .step-number { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.dots { display: flex; gap: 8px; }
+.dots span { width: 16px; height: 16px; border-radius: 8px; background: var(--hairline); }
+.dots span.filled { background: var(--accent); }
+
+.settings-card { flex: 1 1 440px; min-width: 0; align-self: flex-start; }
+.settings-card > .btn.big { flex: none; }
+.speed-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.speed-value { font-size: 24px; color: var(--accent); font-weight: 700; }
+.speed-row { display: flex; align-items: center; gap: 12px; }
+.track { flex: 1; height: 12px; border-radius: 6px; background: var(--hairline); }
+.track div { height: 12px; border-radius: 6px; background: var(--accent); }
+.setting { display: flex; justify-content: space-between; align-items: center; gap: 16px; min-height: 80px; padding: 8px 0; border-bottom: 1px solid var(--hairline); }
+.setting:last-child { border-bottom: 0; }
+.setting-title { font-size: 24px; font-weight: 700; }
+.setting-hint { font-size: 18px; color: var(--muted); }
+.toggle { width: 72px; height: 40px; border-radius: 20px; border: 2px solid var(--toggle-border); background: var(--hairline); position: relative; flex: none; padding: 0; }
+.toggle .knob { position: absolute; left: 2px; top: 2px; width: 32px; height: 32px; border-radius: 16px; background: var(--surface); }
+.toggle.on { background: var(--accent); border-color: var(--accent); }
+.toggle.on .knob { left: auto; right: 2px; }
+
+#nav { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 16px var(--space-page); border-top: 2px solid var(--hairline); background: var(--surface); }
+#nav .btn { flex: 1 1 140px; }
+.hint { flex: 1 1 100%; text-align: center; font-size: 18px; color: var(--muted); }
+
+.phone-only { display: none; }
+
+/* Below the two-pane width, the spoken answer comes first and the camera is a second view. */
+@media (max-width: 971px) {
+  .phone-only { display: inline-flex; }
+  #main.panes { padding: 20px var(--space-page); gap: 0; }
+  #main.panes #assistant { flex-basis: 100%; }
+  #main.panes #camera { flex-basis: 100%; min-height: 70vh; }
+  body[data-panel="answer"] #main.panes #camera { position: absolute; left: -10000px; width: 320px; height: 240px; min-height: 0; visibility: hidden; }
+  body[data-panel="camera"] #main.panes #assistant { display: none; }
+}

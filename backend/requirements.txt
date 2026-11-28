@@ -1,0 +1,5 @@
+fastapi==0.135.1
+uvicorn[standard]==0.41.0
+sarvamai==0.1.50
+inference-sdk==1.9.0
+httpx==0.28.1

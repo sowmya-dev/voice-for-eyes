@@ -3,6 +3,8 @@
 ## Context
 Handles the `scene` intent. Depends on cloud-assistance for any online answer. See [`proposal.md`](proposal.md) for the motivation.
 
+**As built (2026-11-28):** Built through `/api/cloud` with a 768 px JPEG of the current frame and the last four scene turns.
+
 ## Design decisions
 All decisions are **Proposed**. None is agreed until we brainstorm this change.
 

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VoAI voice routing</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;overflow-wrap:anywhere}
+a{color:#3E3EA8}
+a:focus-visible{outline:4px solid #1D1B2E;outline-offset:3px}
+</style>
+</helmet>
+<div style="min-height:1100px;box-sizing:border-box;background:#F4F5F9;color:#1D1B2E;font-family:'Atkinson Hyperlegible',system-ui,sans-serif;padding:40px clamp(16px,4vw,48px);display:flex;flex-direction:column;gap:24px">
+  <div style="max-width:1100px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:24px">
+    <div>
+      <h1 style="margin:0;font-size:36px;line-height:1.15">How VoAI picks the next screen</h1>
+      <p style="margin:10px 0 0;font-size:20px;line-height:1.45;color:#52566B">The voice layer, not a button, decides where the user goes. The screen only follows what was said and what the camera could read.</p>
+    </div>
+
+    <div style="background:#ECECFB;border:2px solid #5B5BD6;border-radius:20px;padding:20px 24px;font-size:20px;line-height:1.45">
+      <b>Gate:</b> “back”, “next” and “settings” are accepted only when the current task is finished. If it isn’t, VoAI says why and returns to the start, then waits for the user’s question.
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;background:#FFFFFF;border:2px solid #C4C8D8;border-radius:16px;padding:16px 20px;font-size:19px;line-height:1.4">
+        <div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">User says or shows</span>Nothing yet</div><div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">VoAI does</span>Keeps listening, camera on</div><div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">Screen</span><a href="Main.dc.html">1 · Ready, listening</a></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;background:#FFFFFF;border:2px solid #C4C8D8;border-radius:16px;padding:16px 20px;font-size:19px;line-height:1.4">
+        <div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">User says or shows</span>Speech is noisy or unclear</div><div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">VoAI does</span>Checks against the label, asks “Did I hear X? Say again?”</div><div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">Screen</span><a href="Listening.dc.html">2 · Noisy speech check</a></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;background:#FFFFFF;border:2px solid #C4C8D8;border-radius:16px;padding:16px 20px;font-size:19px;line-height:1.4">
+        <div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">User says or shows</span>“What is this tablet?” and the label is readable</div><div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">VoAI does</span>Answers danger first, then asks “Do you understand the risk?”</div><div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">Screen</span><a href="Result.dc.html">3 · Medicine identified</a></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;background:#FFFFFF;border:2px solid #C4C8D8;border-radius:16px;padding:16px 20px;font-size:19px;line-height:1.4">
+        <div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">User says or shows</span>Same question, date next to EXP is in the past</div><div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">VoAI does</span>Warns “do not take it”, gives no dose</div><div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">Screen</span><a href="Expired.dc.html">4 · Expired warning</a></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;background:#FFFFFF;border:2px solid #C4C8D8;border-radius:16px;padding:16px 20px;font-size:19px;line-height:1.4">
+        <div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">User says or shows</span>Same question, name or expiry unreadable</div><div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">VoAI does</span>Cleans frames silently, then says what it can read and how to move the pack</div><div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">Screen</span><a href="Blur.dc.html">5 · Can’t read label</a></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;background:#FFFFFF;border:2px solid #C4C8D8;border-radius:16px;padding:16px 20px;font-size:19px;line-height:1.4">
+        <div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">User says or shows</span>“Open settings” after finishing a task</div><div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">VoAI does</span>Opens settings</div><div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">Screen</span><a href="Settings.dc.html">6 · Settings</a></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;background:#FFFFFF;border:2px solid #C4C8D8;border-radius:16px;padding:16px 20px;font-size:19px;line-height:1.4">
+        <div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">User says or shows</span>User speaks another language, or says a language name</div><div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">VoAI does</span>Switches the screen text and VoAI’s voice to that language, only when sure</div><div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">Screen</span><a href="Result-hi.dc.html">8 · Same screens in Hindi</a></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;background:#FFFFFF;border:2px solid #C4C8D8;border-radius:16px;padding:16px 20px;font-size:19px;line-height:1.4">
+        <div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">User says or shows</span>Still unreadable after moving the pack</div><div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">VoAI does</span>Asks to flip the strip or turn it sideways. Repeats as many times as needed, counting attempts</div><div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">Screen</span><a href="Flip.dc.html">5b · Flip or rotate</a></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;background:#FFFFFF;border:2px solid #C4C8D8;border-radius:16px;padding:16px 20px;font-size:19px;line-height:1.4">
+        <div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">User says or shows</span>“Take photo”, or the user holds still</div><div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">VoAI does</span>Counts down 3, 2, 1, takes a photo, reads it. If still unreadable, goes back to flip or rotate</div><div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">Screen</span><a href="Photo.dc.html">5c · Taking a photo</a></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;background:#FFFFFF;border:2px solid #C4C8D8;border-radius:16px;padding:16px 20px;font-size:19px;line-height:1.4">
+        <div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">User says or shows</span>“Later”, “I’ll come back”, or silence after a request</div><div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">VoAI does</span>Pauses, keeps listening for “continue”, remembers the medicine while the page is open</div><div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">Screen</span><a href="Paused.dc.html">5d · Come back later</a></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;background:#ECECFB;border:2px solid #5B5BD6;border-radius:16px;padding:16px 20px;font-size:19px;line-height:1.4">
+        <div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">User says or shows</span>“Next” or “settings” before the task is finished</div><div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">VoAI does</span>Says “Let’s finish this first” and returns to the start</div><div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">Screen</span><a href="Redirect.dc.html">1b · Redirected to start</a></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;background:#FFFFFF;border:2px solid #C4C8D8;border-radius:16px;padding:16px 20px;font-size:19px;line-height:1.4">
+        <div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">User says or shows</span>“Back” or “Start over”</div><div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">VoAI does</span>Goes to the previous step, or to the start for a new question</div><div><span style="display:block;font-size:14px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#52566B;margin-bottom:4px">Screen</span><a href="Main.dc.html">1 · Ready, listening</a></div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1870}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

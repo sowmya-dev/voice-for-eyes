@@ -1,0 +1,29 @@
+:root {
+  --bg: #F4F5F9; /* Page background */
+  --surface: #FFFFFF; /* Cards, header buttons, nav bar, toggles */
+  --camera: #E9EAF3; /* Camera pane background */
+  --ink: #1D1B2E; /* Primary text, focus ring */
+  --muted: #52566B; /* Secondary text, captions, labels */
+  --accent: #5B5BD6; /* Primary actions, mic, icons, highlights */
+  --accent-soft: #ECECFB; /* Soft highlight cards, mic halo */
+  --accent-ring: #D9D9F5; /* Outer ring of the landing mic */
+  --accent-link: #3E3EA8; /* Links on the routing page */
+  --border: #9AA0BA; /* Component borders (cards, buttons) */
+  --hairline: #D5D8E6; /* Dividers, header/nav rules, progress track */
+  --border-soft: #C4C8D8; /* Routing-table borders */
+  --warn: #B45309; /* Expired state: border, icon, text */
+  --warn-bg: #FFF4E0; /* Expired state card */
+  --foil: #AEB3CC; /* Tablet strip foil (illustration) */
+  --blister: #E4E6F2; /* Filled blister (illustration) */
+  --toggle-border: #8E8E93; /* Off-state toggle border */
+  --radius-sm: 16px;
+  --radius-md: 20px;
+  --radius-lg: 24px;
+  --space-page: clamp(16px, 4vw, 40px);
+  --touch-min: 56px;
+  --font-latin: 'Atkinson Hyperlegible', system-ui, sans-serif;
+}
+:lang(hi) { font-family: 'Noto Sans Devanagari', var(--font-latin); }
+:lang(te) { font-family: 'Noto Sans Telugu', var(--font-latin); }
+:lang(kn) { font-family: 'Noto Sans Kannada', var(--font-latin); }
+:lang(ta) { font-family: 'Noto Sans Tamil', var(--font-latin); }

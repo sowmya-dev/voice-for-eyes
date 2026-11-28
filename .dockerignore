@@ -1,0 +1,10 @@
+# Keys must never be copied into an image.
+.env
+.env.*
+.git
+.agent-write.lock
+**/node_modules
+web/dist
+**/__pycache__
+web/.models
+voice-samples

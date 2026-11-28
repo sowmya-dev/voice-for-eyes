@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VoAI · Voice for Eyes</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/vendor/fonts/atkinson-hyperlegible/400.css">
+  <link rel="stylesheet" href="/vendor/fonts/atkinson-hyperlegible/700.css">
+  <link rel="stylesheet" href="/vendor/fonts/noto-sans-devanagari/400.css">
+  <link rel="stylesheet" href="/vendor/fonts/noto-sans-devanagari/700.css">
+  <link rel="stylesheet" href="/vendor/fonts/noto-sans-telugu/400.css">
+  <link rel="stylesheet" href="/vendor/fonts/noto-sans-telugu/700.css">
+  <link rel="stylesheet" href="/vendor/fonts/noto-sans-kannada/400.css">
+  <link rel="stylesheet" href="/vendor/fonts/noto-sans-kannada/700.css">
+  <link rel="stylesheet" href="/tokens.css">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/js/app.js"></script>
+</head>
+<body data-screen="1" data-panel="answer">
+  <header id="header"><div class="wordmark">VoAI</div></header>
+  <main id="main" class="home">
+    <section id="camera" aria-label="Camera">
+      <video id="video" autoplay playsinline muted aria-label="Camera preview"></video>
+      <div id="chip">Camera off</div>
+      <div id="overlay"></div>
+      <div id="controls"></div>
+    </section>
+    <section id="assistant" aria-label="Assistant">
+      <noscript>VoAI needs JavaScript to run.</noscript>
+    </section>
+  </main>
+  <nav id="nav" aria-label="Voice navigation"></nav>
+  <div id="announce" class="sr-only" aria-live="polite" role="status"></div>
+</body>
+</html>

@@ -13,7 +13,7 @@ The system SHALL support all 22 scheduled Indian languages and English, includin
 - **THEN** the system understands the utterance
 
 ### Requirement: Language detection and switching
-The system SHALL detect the language of every utterance, switching the session language only when detection is confident and otherwise retaining it.
+Until the user names a language, the system SHALL detect the language of every utterance, switching the session language only when detection is confident and otherwise retaining it.
 
 #### Scenario: Confident detection
 - **WHEN** a different language is detected with confidence
@@ -23,12 +23,24 @@ The system SHALL detect the language of every utterance, switching the session l
 - **WHEN** a different language is detected without confidence
 - **THEN** the session language is retained
 
+#### Scenario: Language already named
+- **WHEN** the user has named a language and later speech looks like another language
+- **THEN** the session language does not change until the user names another one
+
 ### Requirement: Explicit language change
-The system SHALL change the session language when the user explicitly says a language name.
+When the user says the name of a supported language, the system SHALL change the session language to it and SHALL set speech recognition to that language until the user names another.
 
 #### Scenario: Language named
 - **WHEN** the user says the name of a supported language
 - **THEN** the session changes to that language
+
+#### Scenario: Recognition follows
+- **WHEN** the user has named Telugu
+- **THEN** speech recognition is reopened with te-IN, and the next questions are written in Telugu script
+
+#### Scenario: Named while auto-detecting
+- **WHEN** auto-detection writes the request in English letters or in the language itself, such as "Telugulo matladu" or "తెలుగులో మాట్లాడు", including a single word with an added ending such as "Kannadaka"
+- **THEN** the session changes to Telugu
 
 ### Requirement: Reply language
 The system SHALL reply in the spoken language, preferring the Indian language for mixed speech, and SHALL use the last spoken language when there is no voice input.

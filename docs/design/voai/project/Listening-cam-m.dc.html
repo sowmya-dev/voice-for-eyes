@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VoAI noisy speech check camera</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;overflow-wrap:anywhere}
+button{font-family:inherit;cursor:pointer}
+a:focus-visible,button:focus-visible{outline:4px solid #1D1B2E;outline-offset:3px}
+</style>
+</helmet>
+<div style="min-height:1040px;box-sizing:border-box;background:#F4F5F9;color:#1D1B2E;font-family:'Atkinson Hyperlegible',system-ui,sans-serif;display:flex;flex-direction:column">
+  <header style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;padding:20px clamp(16px,4vw,40px);border-bottom:2px solid #D5D8E6">
+    <div style="font-size:28px;font-weight:700;letter-spacing:0.02em">VoAI <span style="font-size:18px;font-weight:400;color:#52566B">medicine label reader</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center">
+      <a href="Settings-m.dc.html" style="height:48px;padding:0 20px;border-radius:24px;border:2px solid #5B5BD6;color:#5B5BD6;font-size:18px;font-weight:700;display:flex;align-items:center;text-decoration:none;background:#FFFFFF">Settings</a>
+    </div>
+  </header>
+
+  <main style="flex:1;display:flex;flex-wrap:wrap;gap:32px;padding:32px clamp(16px,4vw,40px);box-sizing:border-box;width:100%;max-width:1440px;margin:0 auto">
+    <section aria-label="Camera" style="position:relative;flex:999 1 560px;min-width:0;min-height:620px;background:#E9EAF3;border:2px solid #D5D8E6;border-radius:24px;display:flex;align-items:center;justify-content:center;overflow:hidden">
+      <svg viewBox="0 0 400 220" style="width:70%;max-width:520px" role="img" aria-label="Camera view of a tablet strip">
+        <rect x="30" y="30" width="340" height="160" rx="16" fill="#AEB3CC"/>
+        <circle cx="90" cy="80" r="22" fill="#E4E6F2"/><circle cx="160" cy="80" r="22" fill="#E4E6F2"/><circle cx="230" cy="80" r="22" fill="#E4E6F2"/><circle cx="300" cy="80" r="22" fill="#9AA0BA"/>
+        <circle cx="90" cy="140" r="22" fill="#E4E6F2"/><circle cx="160" cy="140" r="22" fill="#E4E6F2"/><circle cx="230" cy="140" r="22" fill="#9AA0BA"/><circle cx="300" cy="140" r="22" fill="#9AA0BA"/>
+      </svg>
+      <div style="position:absolute;left:16px;top:16px;background:#FFFFFF;border-radius:20px;padding:8px 16px;font-size:18px;font-weight:700;color:#5B5BD6">Camera on</div>
+      <div style="position:absolute;left:16px;right:16px;bottom:16px;display:flex;flex-wrap:wrap;gap:12px;justify-content:center">
+        <button type="button" style="height:56px;padding:0 16px;border-radius:16px;border:2px solid #9AA0BA;background:#FFFFFF;color:#1D1B2E;font-size:20px;font-weight:700;display:inline-flex;align-items:center;gap:10px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg>Torch</button>
+        <button type="button" style="height:56px;padding:0 16px;border-radius:16px;border:2px solid #9AA0BA;background:#FFFFFF;color:#1D1B2E;font-size:20px;font-weight:700;display:inline-flex;align-items:center;gap:10px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 11.5 5.3M19 11a7 7 0 0 1-.6 2.8M12 18v3M3 3l18 18"/></svg>Mute mic</button>
+      </div>
+    </section>
+
+  <a href="Listening-m.dc.html" style="flex:1 1 100%;height:64px;border-radius:16px;border:2px solid #5B5BD6;background:#FFFFFF;color:#5B5BD6;font-size:22px;font-weight:700;display:flex;align-items:center;justify-content:center;text-decoration:none">Back to answer</a>
+  </main>
+  <nav aria-label="Voice navigation" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:16px clamp(16px,4vw,40px);border-top:2px solid #D5D8E6;background:#FFFFFF">
+    <a href="Main-m.dc.html" style="flex:1 1 140px;height:56px;border-radius:16px;font-size:20px;font-weight:700;display:flex;align-items:center;justify-content:center;text-decoration:none;box-sizing:border-box;border:2px solid #5B5BD6;background:#FFFFFF;color:#5B5BD6">‹ Back</a>
+    <a href="Redirect-m.dc.html" style="flex:1 1 140px;height:56px;border-radius:16px;font-size:20px;font-weight:700;display:flex;align-items:center;justify-content:center;text-decoration:none;box-sizing:border-box;border:2px solid #5B5BD6;background:#5B5BD6;color:#FFFFFF">Next ›</a>
+    <div style="flex:1 1 100%;text-align:center;font-size:18px;color:#52566B">Say “back”, or answer me. Skipping ahead brings you back to the start.</div>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1090}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

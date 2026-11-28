@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VoAI landing</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;overflow-wrap:anywhere}
+a:focus-visible{outline:4px solid #1D1B2E;outline-offset:6px}
+</style>
+</helmet>
+<div style="min-height:960px;box-sizing:border-box;background:#F4F5F9;color:#1D1B2E;font-family:'Noto Sans Devanagari','Atkinson Hyperlegible',system-ui,sans-serif;display:flex;flex-direction:column">
+  <header style="display:flex;justify-content:space-between;align-items:center;padding:20px clamp(16px,4vw,40px)">
+    <div style="font-size:28px;font-weight:700;letter-spacing:0.02em">VoAI</div>
+    <a href="Settings.dc.html" style="height:48px;padding:0 20px;border-radius:24px;border:2px solid #5B5BD6;color:#5B5BD6;font-size:18px;font-weight:700;display:flex;align-items:center;text-decoration:none;background:#FFFFFF">सेटिंग्स</a>
+  </header>
+
+  <main style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:40px;padding:24px">
+    <a href="Listening.dc.html" aria-label="वॉइस असिस्टेंट आपके बोलने का इंतज़ार कर रहा है" style="width:260px;height:260px;border-radius:130px;background:#5B5BD6;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 18px #ECECFB,0 0 0 36px #F4F5F9,0 0 0 38px #D9D9F5">
+      <svg width="110" height="110" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+    </a>
+    <div style="font-size:24px;color:#52566B" aria-live="polite">आपकी बात का इंतज़ार है</div>
+  </main>
+  <nav aria-label="Voice navigation" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:16px clamp(16px,4vw,40px);border-top:2px solid #D5D8E6;background:#FFFFFF">
+    <div style="flex:1 1 100%;text-align:center;font-size:18px;color:#52566B">जो चाहिए बोलें, जैसे “यह कौन सी गोली है?” या “सेटिंग्स खोलें”</div>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":970}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

@@ -3,6 +3,8 @@
 ## Context
 Supplies the language of each utterance and of the session to the other changes. No language handling exists in the code yet. See [`proposal.md`](proposal.md) for the motivation.
 
+**As built (2026-11-28):** English, Hindi, Telugu and Kannada only. Sarvam auto-detects the language of each utterance; an Indian script in the words decides the reply language. "Confident" is a probability of 0.7 (R10 still open). Keyword lists and templates are not reviewed by native speakers.
+
 ## Design decisions
 All decisions are **Proposed**. None is agreed until we brainstorm this change.
 
@@ -20,6 +22,11 @@ All decisions are **Proposed**. None is agreed until we brainstorm this change.
 - **Status:** Proposed
 - **Plain English:** Everything a language needs is listed in one table, so gaps are visible.
 - **Pseudo-technical:** `registry[lang] = { sttModel[], templates, voice, intentKeywords, confirmWords, names[] }`
+
+### 4. Pin recognition when a language is named
+- **Status:** Agreed (user, 2026-11-28)
+- **Plain English:** Left to detect by itself, Sarvam wrote two spoken Telugu questions in English letters and called them English. Once the user names a language, we tell Sarvam that language. Automatic switching pauses until the user names another one. Reloading the page goes back to auto-detect.
+- **Pseudo-technical:** `on named(lang): session = lang; pinned = true; stt reconnects with language_code=<lang>-IN; while pinned, ignore detection`
 
 ## High-level architecture flow
 ```text
@@ -51,7 +58,7 @@ language.apply(SessionLanguage, LanguageDetection, namedLang|null) -> SessionLan
 ```
 
 ## Agent flow
-speechEnd -> lid.identify -> pick STT model -> if the intent is `language`, set the named language -> apply policy -> reply in SessionLanguage.
+transcript -> if it names a language: set it, pin it, reopen speech recognition with it -> else, unless pinned, apply the detection policy -> reply in SessionLanguage.
 
 ## Open decisions
 - R8: model coverage of all 23 languages is unchecked. Recommendation: publish a coverage table.

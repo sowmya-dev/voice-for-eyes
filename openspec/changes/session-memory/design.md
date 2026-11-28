@@ -3,6 +3,8 @@
 ## Context
 Last stage of the pipeline. See [`proposal.md`](proposal.md) for the motivation.
 
+**As built (2026-11-28):** Only identification, expiry and dosage answers are replayed. Count and safety-event answers are worked out again, because replaying an old count or symptom reply could be wrong; task 1.2 stays open until that is agreed.
+
 ## Design decisions
 All decisions are **Proposed**. None is agreed until we brainstorm this change.
 

@@ -71,12 +71,28 @@ Speech-to-text for English, Hindi, Telugu and Kannada SHALL use Sarvam's realtim
 - **WHEN** the stream cannot be opened
 - **THEN** the system states that voice input is unavailable
 
-### Requirement: On-device OCR
-OCR SHALL run in the browser on the user's device with PaddleOCR PP-OCRv5 Mobile.
+### Requirement: Label text reading
+When `GOOGLE_CLOUD_VISION_API_KEY` is set and the network works, the system SHALL read label text with Google Cloud Vision document text detection, called from the app server on the two sharpest original colour frames, and SHALL accept a field only when both frames agree. Cloud Vision reads text in any direction, so a vertical name and a horizontal expiry SHALL be read in one look. Otherwise, and whenever Cloud Vision fails, takes longer than 10 seconds or reaches 20 calls a minute, OCR SHALL run in the browser on the user's device with PaddleOCR PP-OCRv5 Mobile. The key SHALL stay on the server.
 
 #### Scenario: Offline label
-- **WHEN** a label is read with no network
+- **WHEN** a label is read with no network, or with no Cloud Vision key
 - **THEN** OCR runs on the device
+
+#### Scenario: Read by Cloud Vision
+- **WHEN** the key is set and a label is read
+- **THEN** the two sharpest colour frames are read by Cloud Vision and a field is accepted only when both agree
+
+#### Scenario: Vertical name, horizontal expiry, read by the cloud
+- **WHEN** a bold coloured name runs along the strip and the expiry runs across it
+- **THEN** both are read in one look, and the name is taken from the size of its letters, not the length of the line
+
+#### Scenario: Cloud Vision unavailable
+- **WHEN** Cloud Vision returns an error, takes longer than 10 seconds or has reached 20 calls in a minute
+- **THEN** the same read is done on the device
+
+#### Scenario: Vision key stays on the server
+- **WHEN** the app status or any reply is sent to the browser
+- **THEN** it shows only whether cloud reading is available, never the key
 
 ### Requirement: Speech recognition speed
 Language identification and transcription of an utterance SHALL finish in under 3 seconds on a basic phone.

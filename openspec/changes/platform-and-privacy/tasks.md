@@ -10,7 +10,7 @@ One task per requirement. Spikes and review gates are in `design.md`, not here.
 - [ ] 1.4 [Requirement: Local-first and offline-capable] Cache app and models and verify offline and no-upload behaviour. Verify: "No network", "Default processing", "Detection fallback".
 - [ ] 1.5 [Requirement: On-device speech stack] Integrate Silero VAD, Whisper language ID and sherpa-onnx in the browser. Verify: "Offline speech".
 - [x] 1.6 [Requirement: Speech-to-text through Sarvam] Stream speech to Sarvam through the app server, keeping the key there, with tests. Verify: "Stream accepted", "Language code", "Key not exposed", "Stream refused".
-- [x] 1.7 [Requirement: On-device OCR] Integrate PaddleOCR in the browser. Verify: "Offline label".
+- [ ] 1.7 [Requirement: Label text reading] Read labels with Cloud Vision on two colour frames from the server, fall back to PaddleOCR in the browser, with tests and one live check. Verify: "Offline label", "Read by Cloud Vision", "Vertical name, horizontal expiry, read by the cloud", "Cloud Vision unavailable", "Vision key stays on the server".
 - [ ] 1.8 [Requirement: Speech recognition speed] Measure recognition latency on a basic phone and meet the limit. Verify: "Latency measurement".
 - [ ] 1.9 [Requirement: Speech test coverage] Run the language, accent and mixed-speech tests and write the report. Verify: "Test report".
 - [x] 1.10 [Requirement: Logging] Add on-device logging and verify nothing is uploaded. Verify: "Interaction logged".

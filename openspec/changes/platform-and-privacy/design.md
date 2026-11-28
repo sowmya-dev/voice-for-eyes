@@ -47,6 +47,11 @@ nginx :3000 proxies /ws/stt and /api/* to backend :8000; SARVAM_API_KEY, ROBOFLO
 - **Plain English:** Besides the user's speech, the text of each reply now goes to Sarvam to be spoken. It can include a medicine name and printed dosage text. Images still stay on the device. See `medicine-label-reading` decision 4.
 - **Pseudo-technical:** `browser -> POST /api/tts -> FastAPI -> AsyncSarvamAI.text_to_speech.convert; nothing logged; same-origin only`
 
+### 10. Google Cloud Vision reads labels, PaddleOCR stays as the fallback
+- **Status:** Agreed (user, 2026-11-28: "let's use Google Cloud Vision API for OCR")
+- **Plain English:** Checked on 2026-11-28 with one call on a made-up label: Cloud Vision read a bold red name running up the strip, the expiry across it and "1 x 15 Tablets" correctly, which the on-device reader does not. The app server sends the two sharpest colour frames, turns the words into lines with their real letter height, and the browser keeps two-frame agreement. With no key, no network, an error, a 10 s timeout or 20 calls in a minute, the on-device reader is used as before. Label photos now go to Google, recorded as departure D16.
+- **Pseudo-technical:** `POST /api/ocr {images: [jpeg, jpeg]} -> vision.googleapis.com/v1/images:annotate?key=… DOCUMENT_TEXT_DETECTION, languageHints [en] -> words joined into lines at LINE_BREAK / EOL_SURE_SPACE -> {pages: [{width, height, lines: [{text, score, box (axis-aligned), size (|v3 - v0|)}]}]}; browser: reading = agree(pages.map(extractFields)); on error -> PaddleOCR copies`
+
 ## High-level architecture flow
 ```text
 docker compose up -> nginx :3000 -> browser loads app and models -> cached
@@ -389,6 +394,7 @@ start -> show main screen -> load models -> report ready and offline readiness -
 - What logs may contain. Recommendation: timings and outcomes only.
 
 ## Risks
+- Label photos are sent to Google when the Vision key is set; each read uses 2 Cloud Vision units.
 - Voice input stops without a network, a key or the Sarvam service.
 - Speech audio and reply text, which may include health details, leave the device.
 - The models may not run in a browser, or be too large or slow for a basic phone. Prerequisite spike: measure size, memory, latency and coverage; bring failures back to spec review.

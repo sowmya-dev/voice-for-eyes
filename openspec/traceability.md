@@ -88,11 +88,11 @@ Each row maps a statement in [`problem-statement.md`](../problem-statement.md) t
 |---|---|
 | sherpa-onnx, Silero VAD, Whisper language ID | platform-and-privacy: On-device speech stack |
 | STT fallback order | platform-and-privacy: Speech-to-text through Sarvam (see D9) |
-| OCR choices | platform-and-privacy: On-device OCR (see D3) |
+| OCR choices | platform-and-privacy: Label text reading (see D3, D16) |
 | OpenCV | platform-and-privacy: Web client |
 
 ## Departures from the submitted prompt
-Decision on 2026-11-27: submit a web app and build Android later (D1-D6). D7-D15 are user decisions on 2026-11-28. `problem-statement.md` is unchanged.
+Decision on 2026-11-27: submit a web app and build Android later (D1-D6). D7-D16 are user decisions on 2026-11-28. `problem-statement.md` is unchanged.
 
 | ID | Prompt says | Specs now say |
 |---|---|---|
@@ -111,6 +111,7 @@ Decision on 2026-11-27: submit a web app and build Android later (D1-D6). D7-D15
 | D13 | Detect language per utterance; switch only when confident | Decided 2026-11-28: after the user names a language, speech recognition is set to it and automatic switching pauses until another is named |
 | D14 | Spend five seconds cleaning the image | Five seconds, or 17 seconds once the name or expiry has been read (user, 2026-11-28) |
 | D15 | At most three retries | Three, or five once the name or expiry has been read (user, 2026-11-28) |
+| D16 | On-device OCR with PaddleOCR | Google Cloud Vision from the app server when its key is set; PaddleOCR on the device otherwise (user, 2026-11-28) |
 
 On-device voice detection and language identification are unchanged; speech-to-text follows D9. Whether the on-device models run in a browser is unverified until the spike described in the platform-and-privacy design.
 

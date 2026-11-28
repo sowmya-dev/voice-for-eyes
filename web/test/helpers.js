@@ -1,4 +1,5 @@
 import { createAssistant } from '../js/core/assistant.js';
+import { labelIdOf } from '../js/core/label.js';
 
 export const GOOD_QUALITY = { sharpness: 300, contrast: 60, brightness: 120, motion: 2 };
 const box = (x, y, w, h) => ({ x, y, w, h });
@@ -10,7 +11,7 @@ export function reading(over = {}) {
     lines: [{ text: 'Dolo 650', score: 0.99, box: box(500, 300, 250, 60) }], frame: { width: 1280, height: 720 },
   };
   const r = { ...base, ...over };
-  if (!('labelId' in over)) r.labelId = r.name ? `${r.name}|${r.expiry ? `${r.expiry.year}-${r.expiry.month}` : ''}` : null;
+  if (!('labelId' in over)) r.labelId = labelIdOf(r.name, r.expiry); // the same rule as real readings
   return r;
 }
 

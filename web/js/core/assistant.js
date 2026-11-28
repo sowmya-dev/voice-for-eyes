@@ -14,7 +14,6 @@ import { blankView } from './contract.js';
 const CLEAN_MS = 5000; // spend this long cleaning frames before asking the user to move anything
 const CLEAN_KNOWN_MS = 17000; // longer once the name or expiry is read: the strip is clearly in view (D14)
 const MAX_ATTEMPTS_KNOWN = 5; // more requests once the name or expiry is read (D15)
-const LABEL_KEEP_MS = 5 * 60 * 1000; // follow-up questions are answered from the remembered label this long
 const MOVE_WAIT_MS = 3000; // time to move the medicine before the next read
 const RISK_WAIT_MS = 8000; // silence after the risk question
 const MAX_ATTEMPTS = 3;
@@ -119,7 +118,9 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
     task: null, // a retry the user can interrupt and come back to
     again: null, // runs the current question again, if it is paused while the label is being read
     paused: null,
-    lastLabel: null, sceneHistory: [], memory: [], cancelTimer: null,
+    lastLabel: null, memory: [], cancelTimer: null,
+    cloudHistory: { scene: [], general: [] }, // questions and answers sent back as context for follow-ups
+    followUp: null, // 'scene' or 'general' right after such an answer: an unmatched question continues it
     label: null, // { reading, at, count }: everything read from the strip in front of the camera, gathered across reads
   };
   const stale = (turn) => turn !== state.turn;
@@ -163,8 +164,8 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
     }
   }
 
-  // The remembered label, while it is fresh.
-  const remembered = () => (state.label && ports.now() - state.label.at < LABEL_KEEP_MS ? state.label : null);
+  // The remembered label: kept until "start over".
+  const remembered = () => state.label;
 
   async function readWithBudget(turn) {
     const started = ports.now();
@@ -197,17 +198,20 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
     await ports.say(risk.text, state.lang);
   }
 
+  const rememberedCount = (label) => (state.label && label.labelId && state.label.reading.labelId === label.labelId ? state.label.count ?? null : null);
+
   // Every answer goes through here: rules first, then screen and speech.
   async function deliver(draft, label, turn, { asked = null, prefix = [], count = null } = {}) {
     const verdict = evaluate(draft, label, today());
     const segments = [...prefix, ...verdict.plan.segments];
     const text = renderSegments(segments, state.lang);
     const emergency = draft.aspect === 'emergency';
+    state.followUp = ['scene', 'general'].includes(draft.intent) ? draft.intent : null;
     const earlier = state.risk;
     const tone = emergency ? 'emergency' : verdict.expired === true ? 'warn' : 'ok';
     show({
       screen: tone === 'ok' ? '3' : '4', tone, asked, spoken: text, dial: emergency ? '108' : null,
-      tiles: draft.medicine && label ? tilesFor(label, today(), state.lang, count) : null,
+      tiles: draft.medicine && label ? tilesFor(label, today(), state.lang, count ?? rememberedCount(label)) : null,
     });
     if (verdict.requiresConfirmation) {
       // A new dosage or expiry answer starts its own check and drops the older one.
@@ -250,11 +254,16 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
   }
 
   async function medicine(intent, turn, ctx) {
-    // "What is this tablet?" is about the tablet in front of the camera now, so it is read again.
-    if (intent.name === 'identify' && intent.aspect === 'all') state.label = null;
     const known = remembered();
     if (known && complete(known.reading, today()) && !namesAnotherMedicine(ctx.text, known.reading)) {
-      return finishMedicine(intent, known.reading, turn, ctx);
+      if (!(intent.name === 'identify' && intent.aspect === 'all')) return finishMedicine(intent, known.reading, turn, ctx);
+      // "What is this tablet?" takes one look: a different strip replaces the remembered one, otherwise memory answers.
+      look(ctx.asked);
+      const glance = await capture();
+      if (stale(turn)) return;
+      if (complete(glance.reading, today())) return finishMedicine(intent, glance.reading, turn, ctx);
+      state.task = { intent, ctx, attempt: 0, cameraCues: 0, hazy: false, last: null };
+      return retry(state.task, turn, glance);
     }
     look(ctx.asked);
     const first = await readWithBudget(turn);
@@ -436,13 +445,13 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
     if (status.enabled && status.keyConfigured && status.online) {
       const reply = await ports.cloud({
         task: intent.name, lang: state.lang, text: ctx.text, image: intent.name === 'scene',
-        history: intent.name === 'scene' ? state.sceneHistory.slice(-4) : [],
+        history: state.cloudHistory[intent.name].slice(-4), // never medicine questions
       });
       if (stale(turn)) return;
       if (reply.text && isMedicalAdvice(reply.text)) segment = seg('cloud.blocked');
       else if (reply.text) {
         segment = seg('cloud.text', { text: reply.text });
-        if (intent.name === 'scene') state.sceneHistory.push({ question: ctx.text, answer: reply.text });
+        state.cloudHistory[intent.name].push({ question: ctx.text, answer: reply.text });
       }
     }
     return deliver({ intent: intent.name, aspect: null, medicine: false, segments: [segment] }, null, turn, ctx);
@@ -508,7 +517,10 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
 
   async function command(name, turn) {
     if (name === 'start_over') {
-      Object.assign(state, { risk: null, unclear: 0, offer: null, task: null, paused: null, history: [], label: null });
+      Object.assign(state, {
+        risk: null, unclear: 0, offer: null, task: null, paused: null, history: [], label: null,
+        lastLabel: null, memory: [], cloudHistory: { scene: [], general: [] }, followUp: null,
+      });
       return show({ screen: '1' }, { remember: false });
     }
     if (name === 'back') {
@@ -607,6 +619,7 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
 
     // While the app waits for the medicine to move, "okay" or an unclear sound means "read again now".
     if (state.task && notARequest) return retry(state.task, turn);
+    if (intent.name === 'unknown' && state.followUp && !state.task && !state.offer) return answer({ name: state.followUp, aspect: null }, turn, ctx);
     if (intent.name === 'unknown' || intent.name === 'yes') return unclear(said, turn);
 
     // Nothing may come before an emergency or "I feel unwell" instruction.

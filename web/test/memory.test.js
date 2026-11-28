@@ -61,13 +61,64 @@ test('Start over: the remembered label is forgotten', async () => {
   assert.ok(t.captures() > reads);
 });
 
-test('Label too old: after 5 minutes the camera is read again', async () => {
+test('Long pause: 20 minutes later the answer still comes from memory', async () => {
   const t = setup({ readings: [reading()] });
   await t.hear('What is this tablet?');
-  t.advance(5 * 60 * 1000 + 1);
+  t.advance(20 * 60 * 1000);
   const reads = t.captures();
   await t.hear('When does it expire?');
-  assert.ok(t.captures() > reads);
+  assert.equal(t.captures(), reads);
+});
+
+test('Same tablet asked again: one look, nothing new, answered without asking to move', async () => {
+  const empty = noExpiry({ name: null, lines: [] });
+  const t = setup({ readings: [reading(), empty] });
+  await t.hear('What is this tablet?');
+  t.clear();
+  await t.hear('What is this tablet?');
+  assert.match(t.said[0].text, /Dolo 650/);
+  assert.doesNotMatch(t.text(), /Move the medicine|hold/i);
+});
+
+// ---------- session state kept and shown ----------
+test('Card keeps the count: an expiry answer after the count still shows it', async () => {
+  const t = setup({ readings: [reading()], counts: [{ count: 4 }] });
+  await t.hear('What is this tablet?');
+  await t.hear('How many are left?');
+  await t.hear('When does it expire?');
+  assert.equal(t.view().tiles.count, '4');
+});
+
+test('Start over clears the state: label, count and general answers are forgotten', async () => {
+  const cloudState = { enabled: true, keyConfigured: true, online: true };
+  const t = setup({ readings: [reading()], counts: [{ count: 4 }], cloudState });
+  await t.hear('What is this tablet?');
+  await t.hear('Who is Gandhi?');
+  await t.hear('start over');
+  const reads = t.captures();
+  await t.hear('When does it expire?');
+  assert.ok(t.captures() > reads, 'the label is read again');
+  await t.hear('Who is Gandhi?');
+  assert.deepEqual(t.cloudCalls.at(-1).history, []);
+});
+
+// ---------- follow-up general questions ----------
+const CLOUD_ON = { enabled: true, keyConfigured: true, online: true };
+
+test('Follow-up on a general answer: the earlier question and answer go along as context', async () => {
+  const t = setup({ cloudState: CLOUD_ON, cloud: (r) => ({ text: r.text.startsWith('Who') ? 'A leader of India.' : 'In Porbandar.' }) });
+  await t.hear('Who is Gandhi?');
+  await t.hear('Where was he born?');
+  assert.equal(t.cloudCalls.length, 2, 'the follow-up with no keyword is still a general question');
+  assert.deepEqual(t.cloudCalls[1].history, [{ question: 'Who is Gandhi?', answer: 'A leader of India.' }]);
+  assert.match(t.said.at(-1).text, /Porbandar/);
+});
+
+test('No medicine context: medicine answers are never sent with a general question', async () => {
+  const t = setup({ readings: [reading()], cloudState: CLOUD_ON });
+  await t.hear('What is this tablet?');
+  await t.hear('Who is Gandhi?');
+  assert.deepEqual(t.cloudCalls[0].history, []);
 });
 
 // ---------- count gathered with the label ----------

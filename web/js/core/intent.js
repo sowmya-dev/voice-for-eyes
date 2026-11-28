@@ -28,9 +28,12 @@ const COUNT = rx('how many .*(left|remaining|there|in (this|the))', 'how many (t
 const WARNINGS = rx('\\bsafe\\b', 'side effects?', '\\bwarnings?\\b', 'pregnan', 'diabet', 'सुरक्षित', 'సురక్షిత', 'ಸುರಕ್ಷಿತ');
 const NUTRITION = rx('nutrition', 'calorie', 'protein', '\\bsugar\\b', 'carbohydrate', '\\bfat\\b', 'sodium', '\\benergy\\b', 'पोषण', 'प्रोटीन', 'पोषक', 'పోషక', 'ప్రోటీన్', 'ಪೌಷ್ಟಿಕ', 'ಪ್ರೋಟೀನ್');
 const EXPIRY = rx('expir', '\\bexp\\b', 'best before', 'एक्सपायर', 'एक्स्पायर', 'समाप्ति', 'खराब', 'kab tak', 'గడువు', 'ఎక్స్పైర', 'ఎక్స్పైరీ', 'ಅವಧಿ', 'ಎಕ್ಸ್ಪೈರ');
+const READ_ALL = rx('read (the |this |it |out )?(label|strip|packet|medicine|everything|all)', 'read (it )?(out|aloud)',
+  'what (else )?(is written|is printed|does it say|does the (label|strip|packet) say)', 'what else (is|does)',
+  'क्या लिखा', 'లేబుల్ చదువు', 'ఏం రాసి', 'ಏನು ಬರೆದಿ', 'ಲೇಬಲ್ ಓದಿ');
 const SCENE = rx('around me', 'surrounding', 'describe (the |this )?(room|scene|place)', 'in front of me', 'where is (the |my |a )?', 'wheres (the |my |a )?',
   'aas ?paas', 'mere saamne', 'आसपास', 'आस पास', 'मेरे सामने', '(दरवाज़ा|दरवाजा) (कहाँ|कहां)', 'చుట్టూ', 'తలుపు ఎక్కడ', 'ಸುತ್ತ(ಮುತ್ತ)? ', 'ಬಾಗಿಲು ಎಲ್ಲಿ');
-const IDENTIFY = rx('what(s| is| are)? (this|that|these)\\b', 'what (tablet|medicine|pill|capsule|food|strip)', 'what am i holding', 'which (tablet|medicine|pill|one is this)', 'identify', 'read (the |this )?(label|strip|medicine|packet)',
+const IDENTIFY = rx('what(s| is| are)? (this|that|these)\\b', 'what (tablet|medicine|pill|capsule|food|strip)', 'what am i holding', 'which (tablet|medicine|pill|one is this)', 'identify', 
   '\\b(yeh|ye) (kya|kaunsi|konsi|kaun)', '(kaunsi|konsi|kaun si) (tablet|goli|dawa|medicine)', '(यह|ये) .*(क्या|कौन)', '(यह|ये) (क्या|कौन)', 'कौन सी (गोली|दवा|टैबलेट)', 'लेबल पढ',
   '(ఇది|ఈ) (.* )?(ఏ|ఏమిటి|ఎంటి|ఏంటి)', 'ఏ (మాత్ర|మందు|టాబ్లెట్)', '\\bidi (emi|enti|ey|ye)\\b', '(ಇದು|ಈ) (.* )?(ಯಾವ|ಏನು)', 'ಯಾವ (ಮಾತ್ರೆ|ಔಷಧಿ)', '\\bidu (yaava|yava|enu)\\b');
 const GENERAL = /^(tell me about|who is|who was|what time|what day|what is the (capital|weather|time|date)|hows the weather|how is the weather)/;
@@ -51,6 +54,7 @@ export function route(text) {
   if (WARNINGS.test(t)) return make('safety', 'warnings');
   if (NUTRITION.test(t)) return make('identify', 'nutrition');
   if (EXPIRY.test(t)) return make('identify', 'expiry');
+  if (READ_ALL.test(t)) return make('identify', 'text');
   if (SCENE.test(t)) return make('scene');
   if (IDENTIFY.test(t)) return make('identify', 'all');
   if (GENERAL.test(t) && !MEDICAL.test(t)) return make('general');

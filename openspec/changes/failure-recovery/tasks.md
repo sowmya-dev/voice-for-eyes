@@ -12,5 +12,5 @@ One task per requirement. Spikes and review gates are in `design.md`, not here.
 - [x] 1.6 [Requirement: Nothing from unclear text] Block guesses and dosage from unclear text, with a test. Verify: "Unclear dosage".
 - [x] 1.7 [Requirement: Retry limit for an unreadable label] Limit movement requests to 3, or 5 once a field is read, and give the final message, with tests. Verify: "Readable on a retry", "Partly read gets five tries", "Third retry fails".
 - [ ] 1.8 [Requirement: Cut strip] Detect a cut-off expiry and skip movement retries, with tests. Verify: "Expiry cut off", "Not sure it is cut".
-- [ ] 1.9 [Requirement: Whole strip for a count] Ask once for the entire strip or the printed side, then answer honestly with what was seen, with tests. Verify: "Strip not fully visible", "Counted on a retry", "One request, then an honest answer", "Used pockets seen, nothing left to work out".
+- [x] 1.9 [Requirement: Whole strip for a count] Ask once for the entire strip or the printed side, then answer honestly with what was seen, with tests. Verify: "Strip not fully visible", "Counted on a retry", "One request, then an honest answer", "Used pockets seen, nothing left to work out".
 - [x] 1.10 [Requirement: Camera check first] Check the camera before asking to move the medicine, with tests. Verify: "Shaky phone", "Moving but sharp", "Hazy camera", "Camera fixed".

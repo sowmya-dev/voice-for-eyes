@@ -50,6 +50,20 @@ export function packSize(text) {
   return n > 0 ? n : null;
 }
 
+const TIERS = [[0.8, 'largest'], [0.55, 'larger'], [0.35, 'large']];
+
+// Every line once, largest letters first, each in a tier relative to the largest line.
+export function rankTexts(items) {
+  const best = new Map();
+  for (const t of items) {
+    const key = normalise(t.text);
+    if (key && !(best.get(key)?.size >= t.size)) best.set(key, { text: t.text.trim(), size: t.size });
+  }
+  const list = [...best.values()].sort((a, b) => b.size - a.size);
+  const top = list[0]?.size || 1;
+  return list.map((t) => ({ ...t, tier: TIERS.find(([ratio]) => t.size >= top * ratio)?.[1] ?? 'small' }));
+}
+
 export function extractFields(ocrLines) {
   const lines = ocrLines.filter((l) => l.score >= MIN_SCORE && l.text.trim());
   const rows = toRows(lines);
@@ -63,6 +77,7 @@ export function extractFields(ocrLines) {
     packCount: packSize(all),
     warnings: rows.filter((r) => /^(warning|caution)\b/i.test(r.text.trim())).map((r) => r.text.trim()),
     nutrition: rows.filter((r) => NUTRITION.test(r.text.trim())).map((r) => r.text.trim()),
+    texts: rankTexts(lines.map((l) => ({ text: l.text, size: l.size ?? l.box.h }))),
   };
 }
 
@@ -102,6 +117,14 @@ export function agree(copies) {
     for (const text of flat) counts.set(normalise(text), [...(counts.get(normalise(text)) ?? []), text]);
     reading[field] = [...counts.values()].filter((v) => v.length >= 2).map((v) => v[0]);
   }
+  // A line is kept when two copies read it the same; its size is the larger of the two.
+  const seen = new Map();
+  for (const copy of copies) {
+    for (const t of new Map((copy.texts ?? []).map((x) => [normalise(x.text), x])).values()) {
+      seen.set(normalise(t.text), [...(seen.get(normalise(t.text)) ?? []), t]);
+    }
+  }
+  reading.texts = rankTexts([...seen.values()].filter((v) => v.length >= 2).map((v) => v.reduce((a, b) => (b.size > a.size ? b : a))));
   reading.labelId = labelIdOf(reading.name, reading.expiry);
   return reading;
 }
@@ -117,6 +140,7 @@ export function mergeReading(known, read) {
   const merged = { ...read };
   for (const field of Object.keys(keyOf)) merged[field] = known[field] ?? read[field];
   for (const field of ['warnings', 'nutrition']) merged[field] = read[field]?.length ? read[field] : (known[field] ?? []);
+  merged.texts = rankTexts([...(known.texts ?? []), ...(read.texts ?? [])]); // both sides of the strip together
   merged.labelId = labelIdOf(merged.name, merged.expiry);
   return merged;
 }

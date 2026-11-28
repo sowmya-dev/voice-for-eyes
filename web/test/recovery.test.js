@@ -147,11 +147,18 @@ test('a different medicine name than the label is unclear', async () => {
   assert.match(t.said[0].text, /say it again, or move somewhere quieter/);
 });
 
-test('count: asks for the entire strip up to three times, then asks someone to count', async () => {
+test('count: one request, then an honest answer', async () => {
   const t = setup({ counts: [{ count: null }] });
   await t.hear('How many are left in this strip?');
-  assert.equal(t.said.filter((s) => /entire strip/.test(s.text)).length, 3);
+  assert.equal(t.said.filter((s) => /entire strip/.test(s.text)).length, 1);
   assert.match(t.said.at(-1).text, /can't count the tablets.*someone/);
+});
+
+test('count: used pockets seen, nothing left to work out, says what it saw', async () => {
+  const t = setup({ readings: [reading({ packCount: null })], counts: [{ count: null, empty: 3 }] });
+  await t.hear('How many are left in this strip?');
+  assert.equal(t.said.filter((s) => /Show me the side/.test(s.text)).length, 1, 'asked once');
+  assert.match(t.said.at(-1).text, /^I can see 3 used, but I can't tell how many are left\. Please ask someone to count them\.$/);
 });
 
 test('count: counted on a retry; with no counter nothing is guessed', async () => {

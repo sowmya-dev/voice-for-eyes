@@ -17,6 +17,7 @@ const MAX_ATTEMPTS_KNOWN = 5; // more requests once the name or expiry is read (
 const MOVE_WAIT_MS = 3000; // time to move the medicine before the next read
 const RISK_WAIT_MS = 8000; // silence after the risk question
 const MAX_ATTEMPTS = 3;
+const COUNT_REQUESTS = 1; // asking again rarely helps a model that only sees used pockets
 const MAX_CAMERA_CUES = 3;
 const MEMORY_SIZE = 20;
 const DIRECTIONS = ['left', 'right', 'up', 'down'];
@@ -91,6 +92,20 @@ function countFrom(result, label) {
   const empty = result?.empty;
   if (empty == null || !total || empty > total) return null;
   return { n: total - empty, segments: [seg('count.from_pack', { total, empty, n: total - empty })] };
+}
+
+// "What is written?": the kept lines, largest letters first, a page at a time. Dosage lines stay out,
+// so the dosage keeps its own safety rules.
+const DOSAGE_LINE = /\b(dos(e|age)|directed|times (a|per) day|daily|once|twice|thrice|every \d+ ?(hours?|hrs?))\b/i;
+const TEXT_PAGE = 8;
+function textAnswer(label, start) {
+  const all = label?.texts ?? [];
+  const lines = all.filter((t) => !DOSAGE_LINE.test(t.text));
+  if (!lines.length) return { segments: [seg(all.length ? 'text.no_dose' : 'text.none')], next: null };
+  const page = lines.slice(start, start + TEXT_PAGE);
+  const segments = [seg('text.lines', { text: page.map((t) => t.text.replace(/[.\s]+$/, '')).join('. ') })];
+  if (start === 0 && lines.length < all.length) segments.push(seg('text.no_dose'));
+  return { segments, next: start + TEXT_PAGE < lines.length ? start + TEXT_PAGE : null };
 }
 
 function composeMedicine(intent, label, today) {
@@ -399,6 +414,23 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
     return retry(task, turn);
   }
 
+  // ---------- everything printed ----------
+  async function readAll(turn, ctx) {
+    let label = remembered()?.reading;
+    if (!label?.texts?.length) {
+      look(ctx.asked);
+      const read = await readWithBudget(turn);
+      if (stale(turn)) return;
+      label = read.reading;
+    }
+    const { segments, next } = textAnswer(label, ctx.textStart ?? 0);
+    await deliver({ intent: 'identify', aspect: 'text', medicine: true, segments }, label, turn, ctx);
+    if (stale(turn) || state.risk || next === null) return;
+    state.offer = { aspect: 'text', friendly: true, start: next };
+    update({ spoken: `${state.view.spoken} ${renderSegments([seg('text.more')], state.lang)}` });
+    await speak([seg('text.more')]);
+  }
+
   // ---------- counting ----------
   const countOnce = async () => (ports.countTablets ? (await ports.countTablets()) ?? null : null);
   const labelNow = (fallback) => state.label?.reading ?? fallback;
@@ -418,7 +450,7 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
     let result = await countOnce();
     let counted = countFrom(result, labelNow(label));
     // With no counter available, asking the user to move the strip cannot help.
-    for (let asked = 0; !counted && ports.countTablets && asked < MAX_ATTEMPTS; asked += 1) {
+    for (let asked = 0; !counted && ports.countTablets && asked < COUNT_REQUESTS; asked += 1) {
       // Used cells are seen but not how many the strip holds: read the printed side, then work it out.
       const needTotal = result?.empty != null && !labelNow(label).packCount;
       const cue = needTotal ? [seg('count.need_total', { empty: result.empty })] : [seg('count.show_strip')];
@@ -434,7 +466,7 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
     if (stale(turn)) return;
     const seen = counted?.n ?? null;
     if (counted && state.label) Object.assign(state.label, { count: counted.n, countSegments: counted.segments });
-    const segments = counted ? counted.segments : [seg('count.give_up')];
+    const segments = counted ? counted.segments : [result?.empty != null ? seg('count.used_only', { empty: result.empty }) : seg('count.give_up')];
     await deliver({ intent: 'identify', aspect: 'count', medicine: true, segments }, labelNow(label), turn, { ...ctx, count: seen });
     if (seen !== null) await offerNext(labelNow(label), turn);
   }
@@ -514,6 +546,7 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
     if (intent.name === 'scene' || intent.name === 'general') return cloud(intent, turn, ctx);
     if (intent.name === 'safety') return safety(intent, turn, ctx);
     if (intent.name === 'identify' && intent.aspect === 'count') return count(turn, ctx);
+    if (intent.name === 'identify' && intent.aspect === 'text') return readAll(turn, ctx);
     if (intent.name === 'identify' && intent.aspect === 'nutrition') {
       look(ctx.asked);
       return capture().then(({ reading: label }) => stale(turn) ? null : deliver({
@@ -656,12 +689,12 @@ export function createAssistant(ports, { lang = 'en' } = {}) {
 
     const ctx = { text: said, asked: said || null, prefix: [] };
     if (state.offer) {
-      const { aspect, friendly } = state.offer;
+      const { aspect, friendly, start } = state.offer;
       state.offer = null;
       if (isConfirm(said)) {
         state.unclear = 0;
         const wanted = aspect === 'dose' ? { name: 'dose', aspect: null } : { name: 'identify', aspect };
-        if (friendly) return answer(wanted, turn, { ...ctx, fromOffer: true });
+        if (friendly) return answer(wanted, turn, { ...ctx, fromOffer: true, textStart: start });
         return answer(wanted, turn, { ...ctx, prefix: [seg('heard.you_said', { text: said })] });
       }
       if (friendly && notARequest) return speak([seg('offer.declined')]);

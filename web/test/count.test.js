@@ -31,7 +31,7 @@ test('Printed total not read yet: asks for the printed side, reads it, then answ
 test('Printed total never read: no count is guessed', async () => {
   const t = setup({ readings: [reading({ packCount: null })], counts: [usedCells(3)] });
   await t.hear('How many are left?');
-  assert.ok(said(t, /can't count the tablets/), t.text());
+  assert.ok(said(t, /I can see 3 used, but I can't tell how many are left/), t.text());
   assert.ok(!said(t, /should be left/), t.text());
 });
 
@@ -39,7 +39,7 @@ test('More empty than printed: no count is given', async () => {
   const t = setup({ readings: [reading({ packCount: 10 })], counts: [usedCells(12)] });
   await t.hear('How many are left?');
   assert.ok(!said(t, /should be left/), t.text());
-  assert.ok(said(t, /can't count the tablets/), t.text());
+  assert.ok(said(t, /I can see 12 used, but I can't tell how many are left/), t.text());
 });
 
 test('A full-pocket model still counts what it sees, ahead of the printed total', async () => {

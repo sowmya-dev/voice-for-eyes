@@ -33,6 +33,11 @@ All decisions are **Proposed**. None is agreed until we brainstorm this change.
 - **Plain English:** Movement between frames is only a problem if it blurred every frame. Cleaning keeps the sharpest frames and lines them up, so a moving hand with one sharp frame is not asked to hold still.
 - **Pseudo-technical:** `hold_still if quality.motion > LIMITS.motion and quality.sharpness < LIMITS.sharpness`
 
+### 6. A partly read label gets more time and more tries
+- **Status:** Agreed (user, 2026-11-28: "EVEN IF one field is read ... increase the retry limit to 5 ... and the time taken for each read too by 10-15 seconds")
+- **Plain English:** Once the name or the expiry has been read, the strip is clearly in front of the camera, so the app keeps reading for longer before asking, allows five requests instead of three, and shows what it has read on the card while it asks for the rest.
+- **Pseudo-technical:** `known = label.name || label.expiry; budget = known ? 17s : 5s; maxAttempts = known ? 5 : 3; retry screens carry tiles = tilesFor(gathered label)`
+
 ## High-level architecture flow
 ```text
 doubtful speech -> cross-check with camera text -> repeat or move somewhere quieter -> read label + confirm likely request -> repeat the question

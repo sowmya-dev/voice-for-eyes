@@ -92,7 +92,7 @@ Each row maps a statement in [`problem-statement.md`](../problem-statement.md) t
 | OpenCV | platform-and-privacy: Web client |
 
 ## Departures from the submitted prompt
-Decision on 2026-11-27: submit a web app and build Android later (D1-D6). D7-D13 are user decisions on 2026-11-28. `problem-statement.md` is unchanged.
+Decision on 2026-11-27: submit a web app and build Android later (D1-D6). D7-D15 are user decisions on 2026-11-28. `problem-statement.md` is unchanged.
 
 | ID | Prompt says | Specs now say |
 |---|---|---|
@@ -109,6 +109,8 @@ Decision on 2026-11-27: submit a web app and build Android later (D1-D6). D7-D13
 | D11 | Optional cloud through LiteLLM | Decided 2026-11-28: the backend calls OpenRouter's REST API directly with free models, for surroundings and general questions only |
 | D12 | Android TextToSpeech with Google voices (web: best available browser voice, D5) | Decided 2026-11-28: replies are spoken by Sarvam through the app server, so reply text goes to Sarvam. Fallback is an on-device voice; an online browser voice only with cloud help on |
 | D13 | Detect language per utterance; switch only when confident | Decided 2026-11-28: after the user names a language, speech recognition is set to it and automatic switching pauses until another is named |
+| D14 | Spend five seconds cleaning the image | Five seconds, or 17 seconds once the name or expiry has been read (user, 2026-11-28) |
+| D15 | At most three retries | Three, or five once the name or expiry has been read (user, 2026-11-28) |
 
 On-device voice detection and language identification are unchanged; speech-to-text follows D9. Whether the on-device models run in a browser is unverified until the spike described in the platform-and-privacy design.
 

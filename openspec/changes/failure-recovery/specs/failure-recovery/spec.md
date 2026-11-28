@@ -47,32 +47,40 @@ While the intent stays unknown, the system SHALL escalate in this order: ask aga
 - **THEN** the system takes the next step in that order
 
 ### Requirement: Clean before asking again
-The system SHALL NOT immediately ask for another photo, and SHALL first spend five seconds cleaning the image.
+The system SHALL NOT immediately ask for another photo, and SHALL first spend five seconds cleaning the image, or 17 seconds once at least one field of the label (name or expiry) has been read.
 
 #### Scenario: Blurry label
 - **WHEN** the label is blurry
 - **THEN** the system spends five seconds cleaning the image before asking the user to move anything
 
+#### Scenario: Partly read label
+- **WHEN** the name has been read but the expiry has not
+- **THEN** the system keeps reading for 17 seconds before asking the user to move anything
+
 ### Requirement: Unreadable label response
-If the name or expiry is still unreadable after cleaning, the system SHALL state what is readable and then say exactly: "I can't read this. Move the medicine up/down/left/right so I can see the expiry date."
+If the name or expiry is still unreadable after cleaning, the system SHALL keep what was read, show it on the screen card, state what is readable and then say exactly: "I can't read this. Move the medicine up/down/left/right so I can see the expiry date."
 
 #### Scenario: Expiry unreadable
 - **WHEN** the name is readable and the expiry is not
-- **THEN** the system states the name, then says the exact sentence
+- **THEN** the system shows the name on the card, states the name, then says the exact sentence
 
 #### Scenario: One exact direction
 - **WHEN** the system asks the user to move the medicine
 - **THEN** "up/down/left/right" is replaced by the single direction, as the user sees it while holding the medicine, that will bring the unreadable text into better view
 
 ### Requirement: Retry limit for an unreadable label
-The system SHALL make at most 3 attempts for the same unreadable label, where each request to move, flip or turn the medicine, or to take a photo, counts as one attempt, cleaning the image again after each. If it is still unreadable after the third attempt, the system SHALL stop asking, say that it cannot confirm the unreadable information, and suggest that someone check the label before the medicine is taken.
+The system SHALL make at most 3 attempts for the same unreadable label, or at most 5 once at least one field of the label has been read, where each request to move, flip or turn the medicine, or to take a photo, counts as one attempt, cleaning the image again after each. If it is still unreadable after the last attempt, the system SHALL stop asking, say that it cannot confirm the unreadable information, and suggest that someone check the label before the medicine is taken.
 
 #### Scenario: Readable on a retry
 - **WHEN** the information becomes readable after any of the 3 moves
 - **THEN** the system answers from it and asks for no more moves
 
+#### Scenario: Partly read gets five tries
+- **WHEN** the name was read but the expiry is still unreadable after the third move
+- **THEN** the system asks for up to two more moves before it stops
+
 #### Scenario: Third retry fails
-- **WHEN** the information is still unreadable after the third move
+- **WHEN** nothing on the label was read and it is still unreadable after the third move
 - **THEN** the system stops asking, says it cannot confirm it, and suggests that someone check the label before the medicine is taken
 
 ### Requirement: Nothing from unclear text

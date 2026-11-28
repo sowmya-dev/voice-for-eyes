@@ -25,8 +25,8 @@ All decisions are **Proposed**. None is agreed until we brainstorm this change.
 
 ### 4. One remembered label, gathered across reads
 - **Status:** Agreed (user, 2026-11-28: "gather as much contents as it can from the strip ... save the contents in memory and answer back")
-- **Plain English:** Every read adds what it found to one remembered label, so the name from the front and the expiry from the back add up. Follow-up questions are answered from it straight away. The camera is used again for a new tablet, after "start over", or after 5 minutes. A different name means a different strip, so the remembered label is dropped.
-- **Pseudo-technical:** `label = read if read.name or read.expiry differs from label's else merge(label, read); complete(label) = name && expiry; ask(q): if label.complete && now - label.at < 5 min && q.aspect != 'all': answer(label) else read camera`
+- **Plain English:** Every read adds what it found to one remembered label, so the name from the front and the expiry from the back add up. Follow-up questions are answered from it straight away. It is kept until "start over"; asking what a tablet is takes one look, and only a different strip replaces it. A different name means a different strip, so the remembered label is dropped.
+- **Pseudo-technical:** `label = read if read.name or read.expiry differs from label's else merge(label, read); complete(label) = name && expiry; ask(q): if label.complete: q.aspect == 'all' ? (look once; differs ? new label : label) : answer(label) else read camera`
 
 ### 5. Count in the background
 - **Status:** Agreed (user, 2026-11-28)
@@ -65,8 +65,7 @@ before composing: confirm the current label -> look up -> replay or build -> sto
 - The queue has no size limit in the prompt. Recommendation: keep the last 20 entries.
 - Whether a differently worded question counts as repeated. Recommendation: only the same intent and normalised wording.
 
-- The 5-minute window is a guess; tune it from use.
 
 ## Risks
 - A new strip mistaken for the old one would replay the wrong answer. Mitigation: read the current label before replaying.
-- A strip swapped for another with the same name keeps the first strip's fields for up to 5 minutes. Asking "What is this tablet?" reads it again.
+- A strip swapped for one with the same name and expiry keeps the first strip's count until "start over" or "I took one".

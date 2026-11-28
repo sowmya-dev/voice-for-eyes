@@ -39,23 +39,27 @@ While the user is asking about one strip, the system SHALL combine what each rea
 - **THEN** the earlier fields are dropped and the new expiry, with its warning, is used
 
 ### Requirement: Answer from the remembered label
-After a label is complete, the system SHALL answer medicine questions (expiry, dosage, purpose) from the remembered label without reading the camera, for 5 minutes after the label was last read. The system SHALL read the camera again when the user asks to identify a medicine ("What is this tablet?"), names a different medicine, or says "start over", or when 5 minutes have passed.
+After a label is complete, the system SHALL answer medicine questions (expiry, dosage, purpose, count) from the remembered label without asking the user to hold the strip again, until the user says "start over". When the user asks to identify a medicine ("What is this tablet?") or names a different medicine, the system SHALL take one look: if it finds a different name or expiry, that strip replaces the remembered one; otherwise the answer comes from the remembered label, with no request to move the strip.
 
 #### Scenario: Follow-up question
 - **WHEN** the label has been read and the user asks "When does it expire?"
 - **THEN** the answer comes from the remembered label and the camera is not read
 
 #### Scenario: New tablet
-- **WHEN** the user asks "What is this tablet?"
-- **THEN** the camera is read again and the new label replaces the remembered one
+- **WHEN** the user asks "What is this tablet?" while showing a different strip
+- **THEN** the new label replaces the remembered one
+
+#### Scenario: Same tablet asked again
+- **WHEN** the user asks "What is this tablet?" and the look finds nothing new
+- **THEN** the answer comes from the remembered label and the user is not asked to move the strip
 
 #### Scenario: Start over
 - **WHEN** the user says "start over"
 - **THEN** the remembered label is forgotten
 
-#### Scenario: Label too old
-- **WHEN** more than 5 minutes have passed since the label was read
-- **THEN** the camera is read again
+#### Scenario: Long pause
+- **WHEN** the user asks about the expiry 20 minutes after the label was read
+- **THEN** the answer comes from the remembered label
 
 ### Requirement: Count gathered with the label
 When a strip model is configured, the system SHALL count the visible tablets once, in the background, after a label becomes complete, keep the count with the remembered label, and answer a count question from it. The system SHALL forget the count when the user says they took a tablet.
@@ -67,3 +71,25 @@ When a strip model is configured, the system SHALL count the visible tablets onc
 #### Scenario: Tablet taken
 - **WHEN** the user says they took a tablet
 - **THEN** the remembered count is forgotten and the next count question reads the camera
+
+### Requirement: Session state kept and shown
+The system SHALL keep everything it has learnt and answered in the session (the label fields, the count, and each question with its answer) until the user says "start over", and SHALL show every known label field and the count on the card of each medicine answer.
+
+#### Scenario: Card keeps the count
+- **WHEN** the count was answered and the user then asks about the expiry
+- **THEN** the expiry answer's card still shows the count
+
+#### Scenario: Start over clears the state
+- **WHEN** the user says "start over"
+- **THEN** the label, the count and the answers are forgotten
+
+### Requirement: Follow-up general questions
+For a general question, the system SHALL send the last 4 general questions and answers of the session as context, so a follow-up such as "and who was his wife?" is understood. Medicine questions and answers SHALL NOT be sent.
+
+#### Scenario: Follow-up on a general answer
+- **WHEN** the user asks "Who is Gandhi?" and then "Where was he born?"
+- **THEN** the second request carries the first question and answer as context
+
+#### Scenario: No medicine context
+- **WHEN** a medicine answer was given before a general question
+- **THEN** the medicine question and answer are not in the context sent

@@ -13,7 +13,7 @@ The system SHALL support all 22 scheduled Indian languages and English, includin
 - **THEN** the system understands the utterance
 
 ### Requirement: Language detection and switching
-Until the user names a language, the system SHALL detect the language of every utterance, switching the session language only when detection is confident and otherwise retaining it.
+Until the user names a language, the system SHALL identify the base language of every utterance from its words, including speech mixed with English such as Telugu with English or Hindi with English, because auto-detecting speech recognition writes Indian languages in English letters and labels them English. When a supported base language is identified with confidence, the system SHALL switch the session language (the interface, the replies and speech recognition) before replying, including on the first utterance from the landing screen. Speech in English letters SHALL be turned into the identified language's own script before the request is understood. A base language with no reply text in the app SHALL leave the session language unchanged.
 
 #### Scenario: Confident detection
 - **WHEN** a different language is detected with confidence
@@ -22,6 +22,22 @@ Until the user names a language, the system SHALL detect the language of every u
 #### Scenario: Uncertain detection
 - **WHEN** a different language is detected without confidence
 - **THEN** the session language is retained
+
+#### Scenario: First Telugu question from the landing screen
+- **WHEN** the user's first words on the landing screen are "Ee maatra enti?"
+- **THEN** the reading screen, the reply and later speech recognition are in Telugu
+
+#### Scenario: Telugu mixed with English
+- **WHEN** the user says "Ee tablet expiry eppudu?"
+- **THEN** the session switches to Telugu and the request is understood as an expiry question
+
+#### Scenario: Hindi mixed with English
+- **WHEN** the user says "is tablet ki expiry kab hai"
+- **THEN** the session switches to Hindi and the request is understood as an expiry question
+
+#### Scenario: Identification unavailable
+- **WHEN** language identification fails or takes longer than 2 seconds
+- **THEN** the utterance is handled in the current session language
 
 #### Scenario: Language already named
 - **WHEN** the user has named a language and later speech looks like another language

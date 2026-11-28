@@ -33,6 +33,11 @@ All decisions are **Proposed**. None is agreed until we brainstorm this change.
 - **Plain English:** The voice read capital names letter by letter ("D O L O six five zero") in all four languages. Names are now said as words, and Sarvam's text clean-up is on. We kept the `bulbul:v3` voice. The newer `bulbul:v4-flash` conversational voices sound like a good fit, but in a round-trip check they gave a wrong or incomplete strength ("Dolo 615" in English; "650" cut short in Kannada), so they are not used. In Kannada the `v3` voice also failed on most strengths unless the digits are read one at a time (2 of 8 correct normally, 8 of 8 digit by digit).
 - **Pseudo-technical:** `speech = forSpeech(text, lang): capital words of 4+ letters -> Capitalised; "Name-650" -> "Name 650"; kn: digits after a Latin name spaced (not years). Server: model=bulbul:v3, speaker=shubh, enable_preprocessing=true. Prepared in advance: the 108 sentence and the risk question; the rest of a reply is fetched while they play.`
 
+### 6. Talk like a person, from fixed templates
+- **Status:** Agreed (user, 2026-11-28: "let it talk to user like a human rather than a robot")
+- **Plain English:** Answers are full sentences, the app says when it is still reading instead of going quiet, and it offers the next useful thing (the expiry, then the count) as a question. It never invents text: every sentence is a template, and the safety sentences are unchanged.
+- **Pseudo-technical:** `id.purpose = "This is {name}, {purpose}."; on first extra read with partlyRead(label): say look.still(name); after deliver(plain answer): next = first of [expiry, count] not asked this session and available; state.offer = {aspect: next}; say confirm.<next>`
+
 ## High-level architecture flow
 ```text
 Intent + LabelReading -> AnswerBuilder -> draft ResponsePlan -> rule engine -> TemplateRenderer -> Speaker

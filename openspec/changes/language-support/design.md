@@ -28,6 +28,11 @@ All decisions are **Proposed**. None is agreed until we brainstorm this change.
 - **Plain English:** Left to detect by itself, Sarvam wrote two spoken Telugu questions in English letters and called them English. Once the user names a language, we tell Sarvam that language. Automatic switching pauses until the user names another one. Reloading the page goes back to auto-detect.
 - **Pseudo-technical:** `on named(lang): session = lang; pinned = true; stt reconnects with language_code=<lang>-IN; while pinned, ignore detection`
 
+### 9. Base language from the words, on the server
+- **Status:** Agreed (user, 2026-11-28: "if a base language is detected, switch the interface")
+- **Plain English:** Tested on 2026-11-28: with automatic language, Sarvam's live speech recognition writes Telugu, Hindi and Kannada speech in English letters and labels it English, with no confidence ("Ee maatra enti?", en-IN). Sarvam's text language identification named all 10 test sentences correctly, including mixed ones, and its transliteration turns them back into Telugu, Hindi or Kannada script, which the request rules understand. Both calls take about 0.6-0.8 s, so they run only while recognition is automatic: once a language is found, recognition is set to it and later questions come back in their own script with no extra calls.
+- **Pseudo-technical:** `stream language_code=auto: on transcript.final -> lang, script = text.identify_language(text) (timeout 2 s); if lang in {hi-IN, te-IN, kn-IN} and script == Latn: text = text.transliterate(text, en-IN -> lang); forward {..., text, base_language: lang}. Browser: detectLanguage prefers base_language; on a switch to a non-English language while recognition is automatic: setSpeechLanguage(lang)`
+
 ## High-level architecture flow
 ```text
 audio -> LID -> LanguageDetection -> LanguagePolicy <- "language named" intent
@@ -63,6 +68,9 @@ transcript -> if it names a language: set it, pin it, reopen speech recognition 
 ## Open decisions
 - R8: model coverage of all 23 languages is unchecked. Recommendation: publish a coverage table.
 - R10: the "confident" threshold has no value. Recommendation: set it from test recordings.
+
+- Each utterance in automatic mode waits for one or two Sarvam text calls (about 0.6-1.5 s) until a language is found; English speakers keep paying about 0.6 s per question.
+- After a switch, recognition is fixed to that language; changing to another Indian language needs the language named.
 
 ## Risks
 - A language may be unsupported by one of the models. Mitigation: coverage table, and bring gaps to spec review.

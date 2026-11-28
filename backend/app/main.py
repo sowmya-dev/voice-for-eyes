@@ -9,6 +9,7 @@ import asyncio
 import base64
 import io
 import logging
+import math
 import os
 import re
 import time
@@ -42,6 +43,10 @@ CALLS_PER_MINUTE = 30
 cloud_calls: deque = deque()
 TTS_CALLS_PER_MINUTE = 90
 tts_calls: deque = deque()
+OCR_CALLS_PER_MINUTE = 20  # each call reads up to 2 frames (2 Cloud Vision units)
+ocr_calls: deque = deque()
+VISION_TIMEOUT_S = 10
+VISION_URL = "https://vision.googleapis.com/v1/images:annotate"
 # Same rule as the browser: medicine and dosage questions never go to the cloud.
 MEDICAL = re.compile(r"\b(dos(e|age)|tablets?|capsules?|pills?|medicines?|medication|drug|\d+\s*mg|expir\w*|paracetamol)\b|गोली|दवा|खुराक|మాత్ర|మందు|ಮಾತ್ರೆ|ಔಷಧ", re.I)
 
@@ -56,7 +61,8 @@ def roboflow_ready() -> bool:
 
 @app.get("/api/status")
 def status():
-    return {"voice": bool(env("SARVAM_API_KEY")), "cloud": bool(env("OPENROUTER_API_KEY")), "visionFallback": roboflow_ready()}
+    return {"voice": bool(env("SARVAM_API_KEY")), "cloud": bool(env("OPENROUTER_API_KEY")), "visionFallback": roboflow_ready(),
+            "cloudOcr": bool(env("GOOGLE_CLOUD_VISION_API_KEY"))}
 
 
 @app.get("/api/cloud/status")
@@ -195,6 +201,75 @@ async def cloud(request: CloudRequest):
         limited = limited or code == 429
         log.warning("cloud %s returned %s", model, code)
     return {"error": "rate_limited" if limited else "unavailable"}
+
+
+# ---------- label text: Google Cloud Vision ----------
+class OcrRequest(BaseModel):
+    images: list[str] = Field(min_length=1, max_length=2)
+
+
+async def ask_vision(key: str, images: list[str]) -> list[dict]:
+    """Document text detection on each image. The key goes in a header, never in a URL."""
+    body = {"requests": [{"image": {"content": image}, "features": [{"type": "DOCUMENT_TEXT_DETECTION"}],
+                          "imageContext": {"languageHints": ["en"]}} for image in images]}
+    async with httpx.AsyncClient(timeout=VISION_TIMEOUT_S) as client:
+        reply = await client.post(VISION_URL, json=body, headers={"X-Goog-Api-Key": key})
+    reply.raise_for_status()
+    return reply.json().get("responses", [])
+
+
+def vision_lines(response: dict) -> dict:
+    """Cloud Vision symbols joined into lines at its line breaks. Each line keeps an axis-aligned box in image
+    pixels (for guidance) and its real letter height, which stays right for text running up the strip."""
+    page = ((response.get("fullTextAnnotation") or {}).get("pages") or [{}])[0]
+    lines, text, words = [], "", []
+
+    def point(v):
+        return (v.get("x", 0), v.get("y", 0))  # Cloud Vision leaves out zero values
+
+    def close():
+        nonlocal text, words
+        if text.strip() and words:
+            corners = [point(v) for w in words for v in w["boundingBox"]["vertices"]]
+            xs, ys = [c[0] for c in corners], [c[1] for c in corners]
+            heights = sorted(math.dist(point(w["boundingBox"]["vertices"][0]), point(w["boundingBox"]["vertices"][3])) for w in words)
+            lines.append({"text": text.strip(), "score": sum(w.get("confidence", 0) for w in words) / len(words),
+                          "box": {"x": min(xs), "y": min(ys), "w": max(xs) - min(xs), "h": max(ys) - min(ys)},
+                          "size": heights[len(heights) // 2]})
+        text, words = "", []
+
+    for block in page.get("blocks", []):
+        for paragraph in block.get("paragraphs", []):
+            for word in paragraph.get("words", []):
+                words.append(word)
+                for symbol in word.get("symbols", []):
+                    text += symbol.get("text", "")
+                    kind = ((symbol.get("property") or {}).get("detectedBreak") or {}).get("type")
+                    if kind in ("SPACE", "SURE_SPACE"):
+                        text += " "
+                    elif kind in ("EOL_SURE_SPACE", "LINE_BREAK", "HYPHEN"):
+                        close()
+            close()
+    return {"width": page.get("width", 0), "height": page.get("height", 0), "lines": lines}
+
+
+@app.post("/api/ocr")
+async def read_text(request: OcrRequest):
+    key = env("GOOGLE_CLOUD_VISION_API_KEY")
+    if not key:
+        return {"error": "key_not_set"}
+    if any(len(image) > MAX_IMAGE_CHARS for image in request.images):
+        return JSONResponse({"error": "too_large"}, status_code=413)
+    if too_many_calls(ocr_calls, OCR_CALLS_PER_MINUTE):
+        return {"error": "rate_limited"}
+    try:
+        responses = await ask_vision(key, request.images)
+    except Exception as error:  # the browser reads the label on the device instead
+        log.warning("cloud text reading failed: %s", type(error).__name__)
+        return {"error": "unavailable"}
+    if len(responses) != len(request.images) or any(r.get("error") for r in responses):
+        return {"error": "unavailable"}
+    return {"pages": [vision_lines(r) for r in responses]}
 
 
 # ---------- strip detection fallback ----------

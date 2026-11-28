@@ -1,5 +1,6 @@
 import asyncio
 import json
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -8,7 +9,8 @@ from starlette.websockets import WebSocketDisconnect
 from app import main
 
 client = TestClient(main.app)
-KEYS = ["SARVAM_API_KEY", "OPENROUTER_API_KEY", "ROBOFLOW_PRIVATE_API_KEY", "ROBOFLOW_MODEL_ID", "ROBOFLOW_CLASS_MAP"]
+KEYS = ["SARVAM_API_KEY", "OPENROUTER_API_KEY", "ROBOFLOW_PRIVATE_API_KEY", "ROBOFLOW_MODEL_ID", "ROBOFLOW_CLASS_MAP",
+        "GOOGLE_CLOUD_VISION_API_KEY"]
 ORIGIN = {"origin": "http://testserver"}
 
 
@@ -17,10 +19,12 @@ def no_keys(monkeypatch):
     for name in KEYS:
         monkeypatch.delenv(name, raising=False)
     main.cloud_calls.clear()
+    main.ocr_calls.clear()
 
 
 def test_starts_without_keys_and_says_what_is_missing():
-    assert client.get("/api/status").json() == {"voice": False, "cloud": False, "visionFallback": False}
+    assert client.get("/api/status").json() == {"voice": False, "cloud": False, "visionFallback": False, "cloudOcr": False}
+    assert client.post("/api/ocr", json={"images": ["aGk="]}).json() == {"error": "key_not_set"}
     assert client.get("/api/cloud/status").json() == {"keyConfigured": False}
     assert client.post("/api/cloud", json={"task": "general", "lang": "en", "text": "who is Gandhi"}).json() == {"error": "key_not_set"}
     assert client.post("/api/vision/fallback", json={"imageJpeg": "aGk="}).json() == {"error": "key_not_set"}
@@ -31,7 +35,7 @@ def test_keys_never_appear_in_responses(monkeypatch):
         monkeypatch.setenv(name, f"secret-{name}")
     body = client.get("/api/status").text + client.get("/api/cloud/status").text
     assert "secret" not in body
-    assert client.get("/api/status").json() == {"voice": True, "cloud": True, "visionFallback": True}
+    assert client.get("/api/status").json() == {"voice": True, "cloud": True, "visionFallback": True, "cloudOcr": True}
 
 
 def test_fallback_needs_a_model_id_so_no_photo_leaves_by_default(monkeypatch):
@@ -275,3 +279,64 @@ def test_speech_reports_a_refused_stream(monkeypatch):
     with client.websocket_connect("/ws/stt?language_code=hi-IN", headers=ORIGIN) as socket:
         message = socket.receive_json()
     assert (message["code"], message["is_fatal"]) == ("unavailable", True)
+
+
+# ---------- Cloud Vision OCR (no live calls: a real response saved on 2026-11-28 is the fixture) ----------
+VISION = json.loads((Path(__file__).parent / "fixtures" / "vision_label.json").read_text())["responses"][0]
+
+
+def test_vision_words_become_lines_with_their_letter_height():
+    page = main.vision_lines(VISION)
+    assert (page["width"], page["height"]) == (960, 640)
+    texts = [line["text"] for line in page["lines"]]
+    assert texts == ["DOLO 650", "Paracetamol Tablets IP 650 mg", "MFG 01/2025 EXP 12/2027", "1 x 15 Tablets", "Batch B2345"]
+    name = page["lines"][0]
+    assert name["box"]["h"] > 300 and 40 < name["size"] < 70, "a vertical name: tall box, real letter height"
+    expiry = page["lines"][2]
+    assert expiry["box"]["h"] < 60 and abs(expiry["size"] - expiry["box"]["h"]) < 10
+    assert all(0.5 < line["score"] <= 1 for line in page["lines"])
+
+
+def test_vision_with_no_text_gives_no_lines():
+    assert main.vision_lines({})["lines"] == []
+
+
+def ocr_with(monkeypatch, reply):
+    monkeypatch.setenv("GOOGLE_CLOUD_VISION_API_KEY", "secret-vision-key")
+    sent = []
+
+    async def ask(key, images):
+        sent.append((key, images))
+        if isinstance(reply, Exception):
+            raise reply
+        return reply
+
+    monkeypatch.setattr(main, "ask_vision", ask)
+    return sent
+
+
+def test_two_frames_are_read_and_the_key_stays_on_the_server(monkeypatch):
+    sent = ocr_with(monkeypatch, [VISION, VISION])
+    reply = client.post("/api/ocr", json={"images": ["aGk=", "aGk="]})
+    assert [len(page["lines"]) for page in reply.json()["pages"]] == [5, 5]
+    assert sent[0][0] == "secret-vision-key" and len(sent[0][1]) == 2
+    assert "secret" not in reply.text + client.get("/api/status").text
+
+
+def test_vision_errors_and_timeouts_say_unavailable(monkeypatch):
+    ocr_with(monkeypatch, RuntimeError("timeout"))
+    assert client.post("/api/ocr", json={"images": ["aGk="]}).json() == {"error": "unavailable"}
+    ocr_with(monkeypatch, [{"error": {"code": 7, "message": "denied"}}])
+    assert client.post("/api/ocr", json={"images": ["aGk="]}).json() == {"error": "unavailable"}
+
+
+def test_vision_calls_are_limited_per_minute(monkeypatch):
+    ocr_with(monkeypatch, [VISION])
+    replies = [client.post("/api/ocr", json={"images": ["aGk="]}).json() for _ in range(main.OCR_CALLS_PER_MINUTE + 1)]
+    assert "pages" in replies[0] and replies[-1] == {"error": "rate_limited"}
+
+
+def test_ocr_takes_one_or_two_images_only(monkeypatch):
+    ocr_with(monkeypatch, [VISION])
+    assert client.post("/api/ocr", json={"images": []}).status_code == 422
+    assert client.post("/api/ocr", json={"images": ["aGk="] * 3}).status_code == 422

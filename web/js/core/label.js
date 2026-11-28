@@ -1,5 +1,5 @@
 // Turns OCR lines from each processed copy into fields, and accepts a field only when two copies agree.
-// OcrLine = { text, score, box: { x, y, w, h } }
+// OcrLine = { text, score, box: { x, y, w, h }, size? } (size: letter height, given by Cloud Vision for text in any direction)
 import { parseExpiry } from './expiry.js';
 import { findIngredient } from './ingredients.js';
 
@@ -10,6 +10,11 @@ const NUTRITION = /^(energy|protein|carbohydrate|total sugar|sugar|total fat|sat
 export function toRows(lines) {
   const rows = [];
   for (const line of [...lines].sort((a, b) => a.box.y - b.box.y)) {
+    // Text running up or down the strip is a row of its own: its tall box says nothing about the rows across it.
+    if (line.size && line.size < line.box.h * 0.6) {
+      rows.push({ mid: Infinity, h: 0, items: [line] });
+      continue;
+    }
     const mid = line.box.y + line.box.h / 2;
     const row = rows.find((r) => Math.abs(r.mid - mid) < Math.min(r.h, line.box.h) * 0.6);
     if (row) row.items.push(line);
@@ -26,10 +31,11 @@ function findName(rows) {
     .filter((i) => /[A-Za-z]{3}/.test(i.text) && !NOT_A_NAME.test(i.text))
     .map((item) => ({ item, row })));
   if (!candidates.length) return null;
-  const best = candidates.reduce((a, b) => (b.item.box.h > a.item.box.h ? b : a));
+  const height = (i) => i.size ?? i.box.h; // letter height, whatever direction the text runs
+  const best = candidates.reduce((a, b) => (height(b.item) > height(a.item) ? b : a));
   // Brand and strength are often split into two boxes of similar height.
   return best.row.items
-    .filter((i) => i === best.item || (i.box.h >= best.item.box.h * 0.75 && /^\W*\d{2,4}\s*(mg)?\W*$/i.test(i.text)))
+    .filter((i) => i === best.item || (height(i) >= height(best.item) * 0.75 && /^\W*\d{2,4}\s*(mg)?\W*$/i.test(i.text)))
     .map((i) => i.text.trim())
     .join(' ');
 }
@@ -37,9 +43,9 @@ function findName(rows) {
 // How many the strip holds, as printed: "Strip of 10", "1 x 10" or "10x10 Tablets" (the per-strip number),
 // or "10 Tablets". "IP" after the word is a pharmacopoeia mark, not a count.
 export function packSize(text) {
-  const m = text.match(/\b(?:strip|pack) of (\d{1,3})\b/i)
-    ?? text.match(/(?<![\d.\w])\d{1,2}\s*[x×]\s*(\d{1,3})(?![\d.])(?!\s*(?:cm|mm|ml|g)\b)/i)
-    ?? text.match(/(?<![\d.])(\d{1,3})\s*(?:tablets|tabs?|capsules|caps?)\b(?!\s*ip\b)/i);
+  const m = text.match(/\b(?:strip|pack)[ \t]+of[ \t]+(\d{1,3})\b/i)
+    ?? text.match(/(?<![\d.\w])\d{1,2}[ \t]*[x×][ \t]*(\d{1,3})(?![\d.])(?![ \t]*(?:cm|mm|ml|g)\b)/i)
+    ?? text.match(/(?<![\d.])(\d{1,3})[ \t]*(?:tablets|tabs?|capsules|caps?)\b(?![ \t]*ip\b)/i);
   const n = m ? Number(m[1]) : 0;
   return n > 0 ? n : null;
 }

@@ -1,9 +1,9 @@
 // Camera frames -> cleanup worker -> OCR on every copy -> two-copy agreement.
 import { extractFields, agree, emptyReading, labelIdOf } from '../core/label.js';
-import { postFallback } from './api.js';
+import { postFallback, postOcr } from './api.js';
 
 const DETECTION = { textDetLimitSideLen: 736, textDetLimitType: 'max' };
-export function createVision(camera) {
+export function createVision(camera, { cloudOcr = () => false } = {}) {
   const worker = new Worker('/vendor/cleanup.worker.js');
   const pending = new Map();
   let nextId = 0;
@@ -66,8 +66,11 @@ export function createVision(camera) {
       return { reading: { ...emptyReading(), lines: [], frame: { width: 1, height: 1 } }, quality: { sharpness: 0, contrast: 0, brightness: 0, motion: 0 } };
     }
     const size = { width: frames[0].width, height: frames[0].height };
-    const [engine, cleaned] = await Promise.all([loadOcr(), clean(frames)]);
-    const { lines, reading } = await readOriented(cleaned.copies, (copy, turn) => readCopy(engine, copy, turn));
+    const colour = cloudOcr() ? frames.map((f) => ({ ...f, data: new Uint8ClampedArray(f.data) })) : null; // the worker takes the originals
+    const cleaned = await clean(frames);
+    // Cloud Vision reads the colour frames in any direction; the device reader is the fallback.
+    const cloud = colour && await readCloud(colour, cleaned.used, postOcr);
+    const { lines, reading } = cloud ?? await readOriented(cleaned.copies, async (copy, turn) => readCopy(await loadOcr(), copy, turn));
     // Guidance uses the copy that found the most text.
     reading.lines = lines.reduce((a, b) => (b.length > a.length ? b : a));
     reading.frame = size;
@@ -85,6 +88,17 @@ export function createVision(camera) {
   }
 
   return { capture, countTablets, warmUp };
+}
+
+// The two sharpest colour frames are read by Cloud Vision; a field counts only when both agree, as with the
+// device reader. Line boxes are already in camera-frame pixels. Null means the device reader is used.
+export async function readCloud(frames, used, post, encode = (frame) => toJpeg({ ...frame, scale: 1 })) {
+  const picked = used.slice(0, 2).map((index) => frames[index]);
+  if (picked.length < 2) return null;
+  const pages = await post(await Promise.all(picked.map(encode)));
+  if (!pages) return null;
+  const lines = pages.map((page) => page.lines.map(({ text, score, box, size }) => ({ text, score, box, size })));
+  return { lines, reading: agree(lines.map(extractFields)) };
 }
 
 // Two of the sharpest frames must agree: on the full pockets of a whole strip (count), or on the number of

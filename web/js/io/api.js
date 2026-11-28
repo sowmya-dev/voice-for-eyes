@@ -1,5 +1,5 @@
 // Calls to the app server. Keys live there; the browser only learns whether they are set.
-const NOTHING = { voice: false, cloud: false, visionFallback: false, reachable: false };
+const NOTHING = { voice: false, cloud: false, visionFallback: false, cloudOcr: false, reachable: false };
 
 export async function getStatus() {
   try {
@@ -28,6 +28,12 @@ export async function fetchSpeech(text, lang, pace) {
   const result = await post('/api/tts', { text: text.slice(0, 2500), lang, pace }, 10000);
   if (!result.audio) return null;
   return Uint8Array.from(atob(result.audio), (c) => c.charCodeAt(0)).buffer;
+}
+
+// Label text from Google Cloud Vision, one page of lines per image. Null means read on the device instead.
+export async function postOcr(images) {
+  const result = await post('/api/ocr', { images }, 12000);
+  return Array.isArray(result.pages) && result.pages.length === images.length ? result.pages : null;
 }
 
 export async function postFallback(imageJpeg) {

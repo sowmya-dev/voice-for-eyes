@@ -96,7 +96,7 @@ test('Pack size written as 1 x 10: the per-strip number, in many printed forms',
     '10 Tablets': 10, '10 TABLETS': 10, '15 Capsules': 15, '10 Caps': 10, '10 Tab': 10, '1 x 10 Tablets': 10, '1x10': 10,
     '1 × 15': 15, '10x10 Tablets': 10, 'Strip of 10 Capsules': 10, 'Pack of 6': 6, 'STRIP OF 14 TABLETS': 14,
     'Paracetamol Tablets IP 500 mg': null, '500 mg': null, 'EXP 12/2027': null, 'MFG 01/2025': null, '0 Tablets': null,
-    '2 x 3 cm': null, 'Batch B12x45': null, '': null,
+    '2 x 3 cm': null, 'Batch B12x45': null, '': null, 'DOLO 650\nTablets': null, '10\nTablets': null,
   };
   for (const [text, n] of Object.entries(cases)) assert.equal(packSize(text), n, text);
 });

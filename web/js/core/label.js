@@ -64,6 +64,26 @@ export function rankTexts(items) {
   return list.map((t) => ({ ...t, tier: TIERS.find(([ratio]) => t.size >= top * ratio)?.[1] ?? 'small' }));
 }
 
+const COMPOSITION = /^(composition\b|each\b.*\bcontains?\b)/i;
+const STRENGTH = /\b\d+(\.\d+)?\s?(mg|mcg|µg|g|ml|iu)\b/i;
+const GENERIC = /\b(tablets?|capsules?|syrup|injection|suspension|gel|cream|drops)\s+(i\.?p|b\.?p|u\.?s\.?p)\b/i;
+const MAKER = /^(?:manufactured|marketed|mfd\.?|mkt\.?d?\.?)\s+(?:and marketed\s+)?by\s*[:\-]?\s*/i;
+
+// The composition: the content of a "Composition" or "Each tablet contains" line and the strength lines after it.
+function compositionOf(rows) {
+  const at = rows.findIndex((r) => COMPOSITION.test(r.text.trim()));
+  if (at < 0) return null;
+  const strip = (t) => t.trim().replace(/^composition\s*[:\-]?\s*/i, '').replace(/^each\b.*?\bcontains?\s*[:\-]?\s*/i, '').trim();
+  const parts = [];
+  if (STRENGTH.test(strip(rows[at].text))) parts.push(strip(rows[at].text));
+  for (const row of rows.slice(at + 1, at + 5)) {
+    const t = strip(row.text);
+    if (STRENGTH.test(t) && !/\b(exp|mfg|mrp|batch)\b/i.test(t)) parts.push(t);
+    else if (parts.length) break;
+  }
+  return parts.length ? parts.join(', ') : null;
+}
+
 export function extractFields(ocrLines) {
   const lines = ocrLines.filter((l) => l.score >= MIN_SCORE && l.text.trim());
   const rows = toRows(lines);
@@ -78,6 +98,9 @@ export function extractFields(ocrLines) {
     warnings: rows.filter((r) => /^(warning|caution)\b/i.test(r.text.trim())).map((r) => r.text.trim()),
     nutrition: rows.filter((r) => NUTRITION.test(r.text.trim())).map((r) => r.text.trim()),
     texts: rankTexts(lines.map((l) => ({ text: l.text, size: l.size ?? l.box.h }))),
+    composition: compositionOf(rows),
+    generic: rows.find((r) => GENERIC.test(r.text) && !COMPOSITION.test(r.text.trim()))?.text.trim() ?? null,
+    maker: rows.map((r) => r.text.trim()).filter((t) => MAKER.test(t)).map((t) => t.replace(MAKER, '').trim()).find(Boolean) ?? null,
   };
 }
 
@@ -90,6 +113,9 @@ const keyOf = {
   expiry: (e) => `${e.year}-${e.month}-${e.day ?? ''}`,
   dosage: normalise,
   packCount: String,
+  composition: normalise,
+  generic: normalise,
+  maker: normalise,
 };
 
 function accept(values, key) {

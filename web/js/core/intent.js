@@ -28,6 +28,11 @@ const COUNT = rx('how many .*(left|remaining|there|in (this|the))', 'how many (t
 const WARNINGS = rx('\\bsafe\\b', 'side effects?', '\\bwarnings?\\b', 'pregnan', 'diabet', 'सुरक्षित', 'సురక్షిత', 'ಸುರಕ್ಷಿತ');
 const NUTRITION = rx('nutrition', 'calorie', 'protein', '\\bsugar\\b', 'carbohydrate', '\\bfat\\b', 'sodium', '\\benergy\\b', 'पोषण', 'प्रोटीन', 'पोषक', 'పోషక', 'ప్రోటీన్', 'ಪೌಷ್ಟಿಕ', 'ಪ್ರೋಟೀನ್');
 const EXPIRY = rx('expir', '\\bexp\\b', 'best before', 'एक्सपायर', 'एक्स्पायर', 'समाप्ति', 'खराब', 'kab tak', 'గడువు', 'ఎక్స్పైర', 'ఎక్స్పైరీ', 'ಅವಧಿ', 'ಎಕ್ಸ್ಪೈರ');
+const COMPOSITION_Q = rx('composition', 'what (is|does) (it|this)( tablet| medicine)? (made (of|from)|contain)', 'what does it contain', "what'?s in (it|this)",
+  'ingredients?', 'chemical( name)?', 'generic( name)?', '\\bsalt\\b', 'contents', 'इसमें क्या (है|हैं)', 'रासायनिक', 'साल्ट', 'संरचना',
+  'ఏముంది', 'ఏమి ఉంది', 'రసాయన', 'ಏನಿದೆ', 'ರಾಸಾಯನಿಕ');
+const DESCRIBE = rx('describe (it|this|the (tablet|medicine|strip|pill|capsule))', 'tell me (more |everything )?about (it|this|the (tablet|medicine|strip|pill|capsule))',
+  'more about (it|this)', '(more|full) details', 'बारे में बता', 'గురించి చెప్ప', 'ಬಗ್ಗೆ ಹೇಳ');
 const READ_ALL = rx('read (the |this |it |out )?(label|strip|packet|medicine|everything|all)', 'read (it )?(out|aloud)',
   'what (else )?(is written|is printed|does it say|does the (label|strip|packet) say)', 'what else (is|does)',
   'क्या लिखा', 'లేబుల్ చదువు', 'ఏం రాసి', 'ಏನು ಬರೆದಿ', 'ಲೇಬಲ್ ಓದಿ');
@@ -54,6 +59,8 @@ export function route(text) {
   if (WARNINGS.test(t)) return make('safety', 'warnings');
   if (NUTRITION.test(t)) return make('identify', 'nutrition');
   if (EXPIRY.test(t)) return make('identify', 'expiry');
+  if (COMPOSITION_Q.test(t)) return make('identify', 'composition');
+  if (DESCRIBE.test(t)) return make('identify', 'describe');
   if (READ_ALL.test(t)) return make('identify', 'text');
   if (SCENE.test(t)) return make('scene');
   if (IDENTIFY.test(t)) return make('identify', 'all');

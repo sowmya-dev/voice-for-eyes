@@ -34,18 +34,34 @@ test('third retry fails: nothing read gets three attempts, then ask someone to c
   const attempts = [...new Set(t.views.filter((v) => v.attempt).map((v) => `${v.screen}:${v.attempt}/${v.attempts}`))];
   assert.deepEqual(attempts, ['5:1/3', '5b:2/3', '5b:3/3']);
   assert.match(t.said.at(-1).text, FINAL);
-  assert.equal(t.view().final, true);
+  assert.ok(t.views.some((v) => v.final), 'the final message is shown');
 });
 
-test('partly read gets five tries, with what was read on the card', async () => {
+test('Back to the landing screen: partly read still gets three requests, the card keeps what was read', async () => {
   const t = setup({ readings: [cutLeft()] });
   await t.hear('What is this tablet?');
   const attempts = [...new Set(t.views.filter((v) => v.attempt).map((v) => `${v.screen}:${v.attempt}/${v.attempts}`))];
-  assert.deepEqual(attempts, ['5:1/5', '5b:2/5', '5b:3/5', '5b:4/5', '5b:5/5']);
-  assert.equal(t.said.filter((s) => /Move the medicine/.test(s.text)).length, 5);
+  assert.deepEqual(attempts, ['5:1/3', '5b:2/3', '5b:3/3']);
+  assert.equal(t.said.filter((s) => /Move the medicine/.test(s.text)).length, 3);
   assert.match(t.said.at(-1).text, FINAL);
+  assert.equal(t.view().screen, '1', 'back to the landing screen');
   const asking = t.views.find((v) => v.screen === '5');
   assert.equal(asking.tiles?.name, 'Dolo 650', 'the name stays on the card while the expiry is asked for');
+  t.clear();
+  await t.hear('What is this tablet?');
+  assert.ok(t.said.some((s) => /I can read: Dolo 650/.test(s.text)), 'what was read is still remembered');
+});
+
+test('Camera requests count too: two hold-still requests and one move make three', async () => {
+  const shaky = { reading: cutLeft(), quality: { ...GOOD_QUALITY, sharpness: 10, motion: 30 } };
+  const steady = { reading: cutLeft(), quality: GOOD_QUALITY };
+  const t = setup({ readings: [...Array(2 * READS_PER_BUDGET)].fill(shaky).concat(Array(40).fill(steady)) });
+  await t.hear('What is this tablet?');
+  const requests = asked(t).filter((s) => /hold the phone still|Move the medicine/i.test(s.text));
+  assert.equal(requests.length, 3, requests.map((s) => s.text).join(' | '));
+  assert.match(requests[0].text, /hold the phone still/i);
+  assert.match(requests[2].text, /Move the medicine/);
+  assert.equal(t.view().screen, '1');
 });
 
 test('readable on a retry: answer and stop asking', async () => {

@@ -119,7 +119,8 @@ test('a spoken year is not mistaken for another medicine', async () => {
 test('after the last attempt the task is over, so settings opens', async () => {
   const t = setup({ readings: [noExpiry()] });
   await t.hear('What is this tablet?');
-  assert.equal(t.view().final, true);
+  assert.ok(t.views.some((v) => v.final));
+  assert.equal(t.view().screen, '1', 'back to the landing screen after the final message');
   await t.hear('open settings');
   assert.equal(t.view().screen, '6');
 });

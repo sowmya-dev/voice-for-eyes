@@ -86,10 +86,10 @@ camera cues: "hold the phone still" (motion blur), "please wipe the camera lens"
 - **Plain English:** YOLOv8n in the browser comes first. If it cannot give a result, the backend sends the frame to the SASTRA blister classification and segmentation models on Roboflow. They only find the strip and pockets; the name and expiry are still read by PaddleOCR on the phone.
 - **Pseudo-technical:** `result = yolo.detect(copy); if result is unavailable (model failed to load, error, or no medicine_strip while the camera check passes): result = POST /api/vision/fallback -> FastAPI -> inference_sdk.InferenceHTTPClient(api_key=env ROBOFLOW_API_KEY).infer(frame, model_id) -> mapped to StripDetection; two-copy count agreement still applies`
 
-### 12. Turned copies only when the upright read finds nothing
+### 12. Orientation per field
 - **Status:** Agreed (user, 2026-11-28)
-- **Plain English:** If neither the name nor the expiry is read, the app tries the label turned a quarter, half and three-quarters of the way round, keeps the turn that finds the most confident text, and reads every copy at that turn. If either was read, the strip is the right way up, so nothing extra is tried; the missing field is usually on the other side.
-- **Pseudo-technical:** `if !reading.name && !reading.expiry: best = argmax_k sum(score*len) over OCR(rotate(averaged, k)) for k in {1,2,3}; if best beats upright: re-read all copies at k; boxes mapped back with unrotate(point, k, w, h)`
+- **Plain English:** One strip can print the name running down its length in bold colour and the expiry across it, so there is no single "right way up". Whatever reads upright is kept. For anything still missing, the app reads the picture turned a quarter, half and three-quarters of the way round, and when a turn shows the missing name or expiry, a second copy at that turn must agree before it is accepted.
+- **Pseudo-technical:** `missing = [f in (name, expiry) if !upright[f]]; if missing: probes[k] = OCR(rotate(averaged, k)) for k in {1,2,3}; for f in missing: for k where fields(probes[k])[f] (most text first): confirm = OCR(rotate(enhanced, k)); if agree(probes[k], confirm)[f]: take every still-missing field from that agreement, stop; boxes mapped back with unrotate(point, k, w, h)`
 
 ### 13. Mirror images are not tried
 - **Status:** Agreed (user, 2026-11-28)
@@ -191,6 +191,7 @@ On a turn that needs the label: collect frames -> select -> clean -> read each c
 - Foil glare can look like an empty pocket. Mitigation: test glared strips.
 - All copies come from the same frames, so they can agree on the same misread. Mitigation: test on strips with known values.
 - OpenCV.js and OCR may be too slow in a phone browser. Prerequisite spike: measure time and accuracy on sample strips.
-- Reading turned copies adds up to six OCR runs on the failure path, which is slow on low-end phones.
+- Reading turned copies adds 3 OCR runs of the averaged copy, plus one confirming run per turn that finds a missing field, whenever the name or expiry is missing. That includes strips whose expiry is simply on the back, which is slow on low-end phones.
+- Coloured or bold names may lose contrast in the grey copies; not measured without sample strips.
 - ECC can converge to a wrong alignment on low-texture frames; the averaged copy may then be blurrier. The sharpest frame still leads the average.
 - Each listed model is a separate Roboflow call, so a long list is slower and uses more credits.

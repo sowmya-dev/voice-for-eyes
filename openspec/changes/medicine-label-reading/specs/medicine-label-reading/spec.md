@@ -147,3 +147,30 @@ The label and the strip SHALL be used together. The system SHALL read the printe
 #### Scenario: More empty than printed
 - **WHEN** the label says 10 and 12 empty pockets are reported
 - **THEN** no count is given
+
+### Requirement: Everything printed, by size
+The system SHALL keep every line of text that two copies agree on, with its letter size, ranked from the largest letters down in four tiers (largest, larger, large, small, relative to the largest line), and SHALL merge it across reads into the remembered label until the user says "start over". The name SHALL remain the largest line that is not a known non-name. When the user asks what is written ("Read the label", "What else is written?", "What does it say?"), the system SHALL read the kept lines from the largest letters down, at most 8 at a time, then offer to go on. Lines about dosage SHALL be left out of this reading and the user told to ask for the dosage separately, so dosage stays behind its safety rules; an expired label SHALL still begin with the expired warning.
+
+#### Scenario: Ranked by size
+- **WHEN** a label has a large name, a medium ingredient line and small manufacturer text
+- **THEN** the lines are kept largest first, in that order, with their tiers
+
+#### Scenario: Kept across reads
+- **WHEN** the front is read and then the back
+- **THEN** the lines of both sides are kept together, each once
+
+#### Scenario: Read everything
+- **WHEN** the user asks "What else is written on it?"
+- **THEN** the kept lines are read from the largest letters down, from memory
+
+#### Scenario: More text
+- **WHEN** more than 8 lines are kept and the user says "yes" to going on
+- **THEN** the next 8 lines are read
+
+#### Scenario: Dosage left out
+- **WHEN** a kept line reads "Dosage: 1 tablet twice daily"
+- **THEN** that line is not read out, and the user is told to ask for the dosage separately
+
+#### Scenario: Expired label read out
+- **WHEN** the label has expired and the user asks what is written
+- **THEN** the reply begins with the expired warning

@@ -38,6 +38,11 @@ All decisions are **Proposed**. None is agreed until we brainstorm this change.
 - **Plain English:** Answers are full sentences, the app says when it is still reading instead of going quiet, and it offers the next useful thing (the expiry, then the count) as a question. It never invents text: every sentence is a template, and the safety sentences are unchanged.
 - **Pseudo-technical:** `id.purpose = "This is {name}, {purpose}."; on first extra read with partlyRead(label): say look.still(name); after deliver(plain answer): told += aspects said (identify -> all + expiry); next = first of [all, expiry, count] not told and available; state.offer = {aspect: next}; say confirm.<next>`
 
+### 7. Everything printed is kept, largest letters first
+- **Status:** Agreed (user, 2026-11-28: "The text contents will take precedence by their font size ... have everything collected, read, understood, managed in state")
+- **Plain English:** A strip's biggest letters matter most: the brand, then strength and ingredient, then smaller print. Every line two copies agree on is kept with its letter size, grouped as largest, larger, large or small, and remembered with the rest of the label. Asked what is written, the app reads it biggest first, a few lines at a time. Dosage lines stay out of that reading so the dosage rules still apply.
+- **Pseudo-technical:** `texts = agreed lines -> {text, size: size ?? box.h, tier: size/max >= .8 largest, >= .55 larger, >= .35 large, else small}, sorted by size desc; mergeReading unions texts by normalised text (keep the larger size); intent identify/text -> read texts.filter(not dosage).slice(start, start + 8); more -> offer {aspect: text, start + 8}`
+
 ## High-level architecture flow
 ```text
 Intent + LabelReading -> AnswerBuilder -> draft ResponsePlan -> rule engine -> TemplateRenderer -> Speaker

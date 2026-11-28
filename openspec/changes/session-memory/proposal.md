@@ -8,7 +8,7 @@ Follow-ups and repeated questions need the current session's context, without ke
 - Replay of answers to repeated questions about the same label.
 - One remembered label, gathered across reads and kept until "start over", from which every later question about the strip is answered.
 - A count taken once in the background and kept with the label; general follow-up questions carry the recent general answers.
-- Proposed, not built: that background count is tried once per strip, not after every answer.
+- That background count is tried once per strip, not after every answer.
 
 ## Capabilities
 

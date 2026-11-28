@@ -117,9 +117,9 @@ camera cues: "hold the phone still" (motion blur), "please wipe the camera lens"
 - **Pseudo-technical:** `to_strip_result(minimum=0.7); chain accepts the first model with full or empty pockets; countFrames -> { count: agreed full count (whole strip), empty: agreed empty count }`
 
 ### 18. Find pills by name: SAM 3 measured, Molmo next in line
-- **Status:** Proposed (user, 2026-11-28: "Next in line is to try Molmo from Openrouter"). Nothing is built.
+- **Status:** SAM 3 as a detector that can be chosen, never the default: agreed to build (user, 2026-11-29: "kick off dev, will take the 3 decisions later"). Molmo: Proposed and blocked (decision 20); the user asked on 2026-11-28 to try it next.
 - **Plain English:** The trained strip model sees only used pockets, on one kind of strip, and Google Cloud Vision's object detection sees no pills at all (4 "Coin" on a strip of 10). A detector that is told what to look for works on any strip. SAM 3 on Roboflow was measured on 12 hand-counted photos (decision 20). It outlined every one of the 15 strips in the 8 varied photos and never took a box for a strip, which also answers "is the whole strip in view". With pills counted only inside the outline and above 0.7 it was exact on 8 of the 10 strips whose pills show through clear pockets; it left out loose pills, capsules printed on a box and printed foil backs; it missed one strip of flat red tablets completely; and it was confidently wrong once: on a half-used strip it scored the 5 torn-open pockets 0.82-0.88, as high as real tablets, and would have said 10 for 5. So it is good at the outline and usually right on the number, but not safe alone. Molmo is built to point at and count things, so it is the next to try, as the second opinion.
-- **Pseudo-technical:** `sam3: POST {ROBOFLOW_API_URL}/sam3/concept_segment {model_id: sam3/sam3_final, prompts: [{type: text, text: "pill"}, {type: text, text: "blister pack"}], output_prob_thresh: 0.5, format: polygon} -> prompt_results[i].predictions[j] = {masks: polygons, confidence}; strip = the one "blister pack" outline; full = pills with confidence >= 0.7 whose centre is inside it; empty = []. molmo: OpenRouter chat/completions {model: allenai/molmo-2-8b:free, user: [text "Point to each pill that is still in the blister pack.", image]} -> its point markup parsed -> one full pocket per point; strip = null`
+- **Pseudo-technical:** `sam3: POST {ROBOFLOW_API_URL}/sam3/concept_segment {model_id: sam3/sam3_final, prompts: [{type: text, text: "pill"}, {type: text, text: "blister pack"}], output_prob_thresh: 0.5, format: polygon} -> prompt_results[i].predictions[j] = {masks: polygons, confidence}; exactly one "blister pack" outline -> strip = its box; full = pills with confidence >= 0.7 whose centre is inside the outline; empty = []; strips = 1. Any other number of outlines n -> strip = null, full = [], strips = n. molmo: OpenRouter chat/completions {model: allenai/molmo-2-8b:free, user: [text "Point to each pill that is still in the blister pack.", image]} -> its point markup parsed -> one full pocket per point; strip = null`
 
 ### 19. A second opinion before a count is spoken
 - **Status:** Proposed
@@ -191,7 +191,7 @@ LabelReading  = { labelId: string|null, name: AcceptedField, ingredient: Accepte
 StripDetection = { copy: ProcessedCopy.kind, strip: Box|null, label: Box|null, expiry: Box|null, full: Mask[], empty: Mask[] }
 Mask           = { box: Box, points: [x,y][], score: 0..1 }
 Box            = { x, y, w, h, score: 0..1 }   (pixels of the frame)
-PocketResult   = { strip: Box|null, full: Box[], empty: Box[] } | { error }   (what every pocket detector returns; unchanged)
+PocketResult   = { strip: Box|null, full: Box[], empty: Box[], strips?: int } | { error }   (what every pocket detector returns; strips, from a detector that outlines strips, is how many it saw)
 Point          = { x, y }   (pixels of the frame; Molmo's reply is turned into these and nothing else is kept)
 GuidanceCue    = { phase: 'camera'|'strip',
                    action: 'hold_still'|'wipe_lens'|'point_camera'|'left'|'right'|'up'|'down'|'closer'|'farther'|'turn_over'|'place_strip',

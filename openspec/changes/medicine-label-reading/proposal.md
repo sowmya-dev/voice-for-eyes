@@ -9,7 +9,7 @@ The user needs short spoken answers about medicines and food from what is printe
 - Replies that sound like a person: full sentences, a note that reading continues, and one offer of something not yet told.
 - A count worked out from the printed pack size and the used pockets.
 - Everything printed is kept by letter size and read back on request; the composition, generic name, maker and a plain description are answered from memory.
-- Proposed, not built: the count is offered only when it is already known.
+- The count is offered only when it is already known.
 
 ## Capabilities
 

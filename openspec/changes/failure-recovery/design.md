@@ -49,7 +49,7 @@ All decisions are **Proposed**. None is agreed until we brainstorm this change.
 - **Pseudo-technical:** `retry: if task.attempt >= 3: giveUp -> say retry.final, show screen 1; task.attempt += 1 for camera and strip cues alike`
 
 ### 9. One request per strip, not per question
-- **Status:** Proposed (the user reported on 2026-11-28 that the app still asks to show the strip again and again, then asked for spec only; not built)
+- **Status:** Agreed (user, 2026-11-29: "kick off dev, will take the 3 decisions later"), after the user reported on 2026-11-28 that the app still asks to show the strip again and again
 - **Plain English:** Three things still brought the request back. The app offered to count after almost every answer although it could not (medicine-label-reading, decision 8); a "yes" then asked the user to show the strip; and every repeated count question asked again. The request is now made at most once for a strip in a session. Asked again, the app takes another look without asking and says honestly what it sees. With more than one strip in view it asks, once, to see just one.
 - **Pseudo-technical:** `entry.countAsked = true after the first request for this strip; count(): result = countOnce(); if !counted and !entry.countAsked: ask once (show_strip | one_strip | show_print), look again; then answer (count | used_only | give_up) with no further request`
 

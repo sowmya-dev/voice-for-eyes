@@ -44,7 +44,7 @@ All decisions are **Proposed**. None is agreed until we brainstorm this change.
 - **Pseudo-technical:** `texts = agreed lines -> {text, size: size ?? box.h, tier: size/max >= .8 largest, >= .55 larger, >= .35 large, else small}, sorted by size desc; mergeReading unions texts by normalised text (keep the larger size); intent identify/text -> read texts.filter(not dosage).slice(start, start + 8); more -> offer {aspect: text, start + 8}`
 
 ### 8. Offer the count only when it is already known
-- **Status:** Proposed (the user reported on 2026-11-28 that the app still asks to show the strip again and again, then asked for spec only; not built)
+- **Status:** Agreed (user, 2026-11-29: "kick off dev, will take the 3 decisions later"), after the user reported on 2026-11-28 that the app still asks to show the strip again and again
 - **Plain English:** "Do you want to know how many tablets are left?" was offered whenever a strip model was set up, even when counting had just failed, and a "yes" then asked the user to show the strip. An offer must be something the app can answer on the spot, so the count is offered only when a count is already remembered.
 - **Pseudo-technical:** `available.count = typeof state.label?.count === 'number'` (today: a strip model is configured)
 

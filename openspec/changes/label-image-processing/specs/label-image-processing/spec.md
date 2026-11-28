@@ -120,7 +120,7 @@ The system SHALL accept a count of the full pockets it can see only when the who
 - **THEN** no count is accepted
 
 ### Requirement: Pills found by name
-The system SHALL support pocket detectors that find tablets and capsules by name on any kind of strip, with no model trained on that strip, each behind the pocket-detector adapter and chosen with `POCKET_DETECTOR`: `sam3` (SAM 3 concept segmentation on Roboflow, which outlines every "pill" and every "blister pack") and `molmo` (Molmo on OpenRouter, which points at each tablet or capsule and gives no outline). Each SHALL be turned into the result every pocket detector gives: the strip outline when the detector gives one, the full pockets and the empty pockets. Only detections that lie inside the strip outline SHALL be counted, so that loose pills and pictures of pills on a box are left out, and detections below the confidence bar set by the trial SHALL be dropped. When more than one strip is outlined, no count SHALL be given. Nothing a model writes SHALL be shown or spoken: only the number of detections parsed from its reply is used, and a reply that cannot be parsed gives no result. Neither detector SHALL be switched on by default until it has passed the trial in `design.md`.
+The system SHALL support a pocket detector that finds tablets and capsules by name on any kind of strip, with no model trained on that strip: `sam3` (SAM 3 concept segmentation on Roboflow, which outlines every "pill" and every "blister pack"), behind the pocket-detector adapter and chosen with `POCKET_DETECTOR=sam3`. Its reply SHALL be turned into the result every pocket detector gives (the strip outline, the full pockets and the empty pockets), together with how many strips it outlined. Only pills that lie inside the strip outline SHALL be counted, so that loose pills and pictures of pills on a box are left out, and pills below a confidence of 0.7 SHALL be dropped. When more than one strip is outlined, or none, no strip and no pockets SHALL be returned. The detector SHALL NOT be the default until it has passed the trial in `design.md`.
 
 #### Scenario: Pills on the strip
 - **WHEN** `sam3` is chosen and a whole strip with 6 capsules is shown with 3 loose capsules beside it
@@ -131,12 +131,19 @@ The system SHALL support pocket detectors that find tablets and capsules by name
 - **THEN** they are not counted
 
 #### Scenario: Used pockets below the bar
-- **WHEN** used pockets are detected with a confidence below the bar
+- **WHEN** used pockets are detected with a confidence below 0.7
 - **THEN** they are not counted as full
 
 #### Scenario: More than one strip
 - **WHEN** two strips are outlined in the frame
-- **THEN** no count is given
+- **THEN** no strip and no pockets are returned, and the result says that two strips were seen
+
+#### Scenario: Chosen, not the default
+- **WHEN** `POCKET_DETECTOR` is not set
+- **THEN** SAM 3 is not called
+
+### Requirement: Molmo points at the pills
+The system SHALL support `molmo` (Molmo on OpenRouter) as a pocket detector that points at each tablet or capsule and gives no strip outline, behind the pocket-detector adapter. Nothing Molmo writes SHALL be shown or spoken: only the number of points parsed from its reply is used, and a reply that cannot be parsed gives no result. It SHALL NOT be built until a provider serves the model and its reply format has been seen in the trial in `design.md`.
 
 #### Scenario: Molmo points
 - **WHEN** `molmo` is chosen and its reply points at 7 tablets
